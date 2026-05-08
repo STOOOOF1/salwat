@@ -1,7 +1,9 @@
 import axios from 'axios'
 
 const ORIGIN = import.meta.env.VITE_API_URL
-const BASE_URL = ORIGIN ? `${ORIGIN}/api` : '/api'
+const BASE_URL = ORIGIN
+  ? (ORIGIN.startsWith('http') ? `${ORIGIN}/api` : `https://${ORIGIN}/api`)
+  : '/api'
 
 const api = axios.create({
   baseURL: BASE_URL,
