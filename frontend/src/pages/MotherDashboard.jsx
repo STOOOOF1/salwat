@@ -247,11 +247,16 @@ function LogManagement() {
   const [pendingOnly, setPendingOnly] = useState(true)
   const [error, setError] = useState('')
 
-  useEffect(() => {
+  const fetchLogs = useCallback(() => {
     let cancelled = false; setLoading(true)
     getAllLogs(pendingOnly).then(res => { if (!cancelled) setLogs(res.data) }).catch(() => { if (!cancelled) setError('فشل في تحميل التسجيلات') }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [pendingOnly])
+
+  useEffect(() => {
+    const cleanup = fetchLogs()
+    return cleanup
+  }, [fetchLogs])
 
   const handleApprove = async (logId, isApproved) => {
     try {
