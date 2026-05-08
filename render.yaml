@@ -24,10 +24,7 @@ services:
     pullRequestPreviewsEnabled: true
     envVars:
       - key: VITE_API_URL
-        fromService:
-          name: salwat-backend
-          type: web
-          property: host
+        value: https://salwat-backend.onrender.com
     headers:
       - path: /*
         name: X-Frame-Options
