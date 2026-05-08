@@ -3,6 +3,7 @@ services:
     name: salwat-backend
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
     plan: free
     envVars:
       - key: DATABASE_URL
