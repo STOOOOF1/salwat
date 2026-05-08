@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { getPrayerTimes, logPrayer, getMyLogs } from '../services/api'
+import { fmtHijri, fmtTime } from '../utils/date'
 import Celebration from '../components/Celebration'
 
 const PRAYER_NAMES = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']
@@ -304,7 +305,7 @@ export default function ChildDashboard() {
                 </div>
                 <div className="flex items-center gap-2 text-gray-500">
                   <span className="font-bold text-primary-600">+{log.points_awarded}</span>
-                  <span>{new Date(log.created_at).toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span>{fmtTime(log.created_at)}</span>
                 </div>
               </div>
             ))}

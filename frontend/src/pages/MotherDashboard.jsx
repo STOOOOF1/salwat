@@ -5,6 +5,7 @@ import {
   getAllLogs, approveLog,
   getRewards, approveReward,
 } from '../services/api'
+import { fmtHijri } from '../utils/date'
 
 const PRAYER_LABELS = { Fajr: 'الفجر', Dhuhr: 'الظهر', Asr: 'العصر', Maghrib: 'المغرب', Isha: 'العشاء' }
 const PRAYER_ICONS = { Fajr: '🌅', Dhuhr: '☀️', Asr: '🌤', Maghrib: '🌅', Isha: '🌙' }
@@ -302,7 +303,7 @@ function LogManagement() {
                 </span>
               </div>
               <div className="text-xs text-gray-500 font-cairo flex justify-between">
-                <span>{PRAYER_LABELS[log.prayer_name]} | {new Date(log.logged_at).toLocaleString('ar-SA')}</span>
+                <span>{PRAYER_LABELS[log.prayer_name]} | {fmtHijri(log.logged_at)}</span>
                 <span className="flex gap-1">
                   {log.is_congregation && <span title="صلاة الجماعة">🕌</span>}
                   {log.is_early_time && <span title="في أول الوقت">⏰</span>}
@@ -377,7 +378,7 @@ function RewardManagement() {
                 <span className="text-3xl">🏆</span>
               </div>
               <div className="text-xs text-gray-400 font-cairo mb-3">
-                {new Date(rw.created_at).toLocaleString('ar-SA')}
+                {fmtHijri(rw.created_at)}
               </div>
               <button
                 onClick={() => handleApprove(rw.id, true)}
