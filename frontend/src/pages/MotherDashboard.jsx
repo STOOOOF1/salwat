@@ -339,11 +339,16 @@ function RewardManagement() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  useEffect(() => {
+  const fetchRewards = useCallback(() => {
     let cancelled = false
     getRewards(true).then(res => { if (!cancelled) setRewards(res.data) }).catch(() => { if (!cancelled) setError('فشل في تحميل المكافآت') }).finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    const cleanup = fetchRewards()
+    return cleanup
+  }, [fetchRewards])
 
   const handleApprove = async (id, isApproved) => {
     try {
