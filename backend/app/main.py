@@ -4,7 +4,6 @@ from app.config import settings
 from app.database import engine, Base, SessionLocal
 from app.routers import auth, prayer, admin, leaderboard, archive
 from app.services.cron import init_scheduler
-from seed import run_seed
 
 # Create tables
 Base.metadata.create_all(bind=engine)

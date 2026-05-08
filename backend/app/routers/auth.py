@@ -5,6 +5,7 @@ from app.models import User
 from app.schemas import LoginRequest, TokenResponse, UserResponse
 from app.auth import verify_pin, hash_pin, create_access_token, get_current_user, require_admin
 from app.schemas import PinResetRequest
+from seed import run_seed
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -35,3 +36,12 @@ def reset_own_pin(
     current_user.pin_hash = hash_pin(req.new_pin)
     db.commit()
     return {"message": "PIN updated successfully"}
+
+
+@router.post("/setup")
+def setup_database(db: Session = Depends(get_db)):
+    existing = db.query(User).first()
+    if existing:
+        return {"message": "Database already seeded"}
+    run_seed(db)
+    return {"message": "Database seeded successfully"}
