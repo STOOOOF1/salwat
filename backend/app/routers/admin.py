@@ -79,6 +79,22 @@ def reset_user_pin(
     return user
 
 
+@router.post("/users/{user_id}/reset-points", response_model=UserResponse)
+def reset_user_points(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.total_points = 0
+    db.query(PrayerLog).filter(PrayerLog.user_id == user_id).delete()
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 # ---- Prayer Log Audit ----
 
 @router.get("/logs", response_model=list[PrayerLogResponse])

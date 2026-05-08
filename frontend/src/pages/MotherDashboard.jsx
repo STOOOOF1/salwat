@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import {
-  getUsers, createUser, updateUser, deleteUser, resetUserPin,
+  getUsers, createUser, updateUser, deleteUser, resetUserPin, resetUserPoints,
   getAllLogs, approveLog,
   getRewards, approveReward,
 } from '../services/api'
@@ -133,7 +133,17 @@ function UserManagement() {
     try {
       await resetUserPin(id, newPin)
       setSuccess('تم إعادة تعيين PIN بنجاح')
+      fetchUsers()
     } catch { setError('فشل في إعادة تعيين PIN') }
+  }
+
+  const handleResetPoints = async (id, name) => {
+    if (!window.confirm(`هل أنت متأكدة من تصفير نقاط ${name}؟`)) return
+    try {
+      await resetUserPoints(id)
+      setSuccess(`تم تصفير نقاط ${name}`)
+      fetchUsers()
+    } catch { setError('فشل في تصفير النقاط') }
   }
 
   if (loading) return <div className="text-center py-8 text-gray-400 font-cairo">جاري التحميل...</div>
@@ -221,6 +231,7 @@ function UserManagement() {
             <div className="flex gap-2">
               <button onClick={() => openEdit(u)} className="text-sm text-blue-600 hover:text-blue-800 font-cairo">تعديل</button>
               <button onClick={() => handleResetPin(u.id)} className="text-sm text-gold-600 hover:text-gold-800 font-cairo">PIN</button>
+              <button onClick={() => handleResetPoints(u.id, u.first_name)} className="text-sm text-orange-600 hover:text-orange-800 font-cairo">تصفير</button>
               <button onClick={() => handleDelete(u.id, u.first_name)} className="text-sm text-red-600 hover:text-red-800 font-cairo">حذف</button>
             </div>
           </div>

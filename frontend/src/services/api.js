@@ -67,6 +67,9 @@ export const deleteUser = (id) => api.delete(`/admin/users/${id}`)
 export const resetUserPin = (id, new_pin) =>
   api.put(`/admin/users/${id}/reset-pin`, { new_pin })
 
+export const resetUserPoints = (id) =>
+  api.post(`/admin/users/${id}/reset-points`)
+
 // Admin - Logs
 export const getAllLogs = (pendingOnly = false) =>
   api.get(`/admin/logs?pending_only=${pendingOnly}`)
