@@ -7,7 +7,7 @@ from app.schemas import PrayerLogCreate, PrayerLogResponse, PrayerTimesResponse,
 from app.auth import get_current_user
 from app.config import settings
 from app.services.prayer_times import fetch_prayer_times
-from app.services.settings_helper import get_points_config, get_int_setting, get_reward_milestones
+from app.services.settings_helper import get_points_config, get_reward_milestones
 
 router = APIRouter(prefix="/api/prayer", tags=["prayer"])
 
@@ -27,15 +27,13 @@ def log_prayer(
     db: Session = Depends(get_db),
 ):
     now = datetime.now(timezone.utc)
-    pc = get_points_config(db)
-    gw = pc["golden_window_minutes"]
-    golden_window_end = req.prayer_time + timedelta(minutes=gw)
+    golden_window_end = req.prayer_time + timedelta(minutes=settings.GOLDEN_WINDOW_MINUTES)
     is_within_window = now <= golden_window_end
 
     # Calculate points
     is_kid = current_user.age < 15
-    base = pc["kids_base_points"] if is_kid else pc["adults_base_points"]
-    bonus = pc["kids_bonus_points"] if is_kid else pc["adults_bonus_points"]
+    base = settings.KIDS_BASE_POINTS if is_kid else settings.ADULTS_BASE_POINTS
+    bonus = settings.KIDS_BONUS_POINTS if is_kid else settings.ADULTS_BONUS_POINTS
 
     points = base
     is_approved = True
@@ -67,8 +65,7 @@ def log_prayer(
 
     # Check reward milestones
     new_total = current_user.total_points + points
-    milestones = get_reward_milestones(db)
-    for milestone in milestones:
+    for milestone in settings.REWARD_MILESTONES:
         if new_total >= milestone > current_user.total_points:
             existing = db.query(RewardMilestone).filter(
                 RewardMilestone.user_id == current_user.id,

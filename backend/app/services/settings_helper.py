@@ -19,13 +19,22 @@ def get_int_setting(db: Session, key: str, default: int) -> int:
 
 
 def get_points_config(db: Session) -> dict:
-    return {
-        "kids_base_points": get_int_setting(db, "kids_base_points", settings.KIDS_BASE_POINTS),
-        "kids_bonus_points": get_int_setting(db, "kids_bonus_points", settings.KIDS_BONUS_POINTS),
-        "adults_base_points": get_int_setting(db, "adults_base_points", settings.ADULTS_BASE_POINTS),
-        "adults_bonus_points": get_int_setting(db, "adults_bonus_points", settings.ADULTS_BONUS_POINTS),
-        "golden_window_minutes": get_int_setting(db, "golden_window_minutes", settings.GOLDEN_WINDOW_MINUTES),
-    }
+    try:
+        return {
+            "kids_base_points": get_int_setting(db, "kids_base_points", settings.KIDS_BASE_POINTS),
+            "kids_bonus_points": get_int_setting(db, "kids_bonus_points", settings.KIDS_BONUS_POINTS),
+            "adults_base_points": get_int_setting(db, "adults_base_points", settings.ADULTS_BASE_POINTS),
+            "adults_bonus_points": get_int_setting(db, "adults_bonus_points", settings.ADULTS_BONUS_POINTS),
+            "golden_window_minutes": get_int_setting(db, "golden_window_minutes", settings.GOLDEN_WINDOW_MINUTES),
+        }
+    except Exception:
+        return {
+            "kids_base_points": settings.KIDS_BASE_POINTS,
+            "kids_bonus_points": settings.KIDS_BONUS_POINTS,
+            "adults_base_points": settings.ADULTS_BASE_POINTS,
+            "adults_bonus_points": settings.ADULTS_BONUS_POINTS,
+            "golden_window_minutes": settings.GOLDEN_WINDOW_MINUTES,
+        }
 
 
 def get_reward_milestones(db: Session) -> list[int]:
