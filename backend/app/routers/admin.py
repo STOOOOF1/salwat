@@ -264,7 +264,12 @@ def mark_attendance(
             approved_by=admin.id,
         )
         db.add(log)
+        db.flush()
         created.append(log)
+
+        # Update total_points directly (reliable, doesn't depend on trigger)
+        if approved:
+            u.total_points += points
 
     db.commit()
     return {"message": f"تم تسجيل {len(created)} أطفال", "count": len(created)}

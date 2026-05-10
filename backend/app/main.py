@@ -23,9 +23,7 @@ with engine.connect() as conn:
         CREATE OR REPLACE FUNCTION update_user_points()
         RETURNS TRIGGER AS $$
         BEGIN
-            IF TG_OP = 'INSERT' AND NEW.is_approved THEN
-                UPDATE users SET total_points = total_points + NEW.points_awarded WHERE id = NEW.user_id;
-            ELSIF TG_OP = 'UPDATE' AND NEW.is_approved = TRUE AND OLD.is_approved = FALSE THEN
+            IF TG_OP = 'UPDATE' AND NEW.is_approved = TRUE AND OLD.is_approved = FALSE THEN
                 UPDATE users SET total_points = total_points + NEW.points_awarded WHERE id = NEW.user_id;
             ELSIF TG_OP = 'UPDATE' AND NEW.is_approved = FALSE AND OLD.is_approved = TRUE THEN
                 UPDATE users SET total_points = total_points - OLD.points_awarded WHERE id = NEW.user_id;

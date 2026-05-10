@@ -27,13 +27,15 @@ def log_prayer(
     db: Session = Depends(get_db),
 ):
     now = datetime.now(timezone.utc)
-    golden_window_end = req.prayer_time + timedelta(minutes=settings.GOLDEN_WINDOW_MINUTES)
+    pc = get_points_config(db)
+    gw = pc["golden_window_minutes"]
+    golden_window_end = req.prayer_time + timedelta(minutes=gw)
     is_within_window = now <= golden_window_end
 
     # Calculate points
     is_kid = current_user.age < 15
-    base = settings.KIDS_BASE_POINTS if is_kid else settings.ADULTS_BASE_POINTS
-    bonus = settings.KIDS_BONUS_POINTS if is_kid else settings.ADULTS_BONUS_POINTS
+    base = pc["kids_base_points"] if is_kid else pc["adults_base_points"]
+    bonus = pc["kids_bonus_points"] if is_kid else pc["adults_bonus_points"]
 
     points = base
     is_approved = True
@@ -63,10 +65,16 @@ def log_prayer(
     db.add(log)
     db.flush()
 
+    # Update total_points directly
+    old_total = current_user.total_points
+    if is_approved:
+        current_user.total_points += points
+
     # Check reward milestones
-    new_total = current_user.total_points + points
-    for milestone in settings.REWARD_MILESTONES:
-        if new_total >= milestone > current_user.total_points:
+    new_total = old_total + points
+    milestones = get_reward_milestones(db)
+    for milestone in milestones:
+        if new_total >= milestone > old_total:
             existing = db.query(RewardMilestone).filter(
                 RewardMilestone.user_id == current_user.id,
                 RewardMilestone.milestone_points == milestone,
