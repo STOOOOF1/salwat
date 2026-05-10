@@ -601,20 +601,46 @@ function AttendanceManagement() {
 }
 
 function SettingsManagement() {
-  const [goldenWindow, setGoldenWindow] = useState(30)
+  const [form, setForm] = useState({
+    golden_window_minutes: 30,
+    kids_base_points: 5,
+    kids_bonus_points: 3,
+    adults_base_points: 2,
+    adults_bonus_points: 5,
+    reward_milestones: '50,100,150,200,300,500',
+  })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
   useEffect(() => {
-    getAdminSettings().then(res => setGoldenWindow(res.data.golden_window_minutes)).catch(() => setError('فشل في تحميل الإعدادات')).finally(() => setLoading(false))
+    getAdminSettings().then(res => {
+      setForm({
+        golden_window_minutes: res.data.golden_window_minutes,
+        kids_base_points: res.data.kids_base_points,
+        kids_bonus_points: res.data.kids_bonus_points,
+        adults_base_points: res.data.adults_base_points,
+        adults_bonus_points: res.data.adults_bonus_points,
+        reward_milestones: (res.data.reward_milestones || []).join(','),
+      })
+    }).catch(() => setError('فشل في تحميل الإعدادات')).finally(() => setLoading(false))
   }, [])
+
+  const update = (key, value) => setForm({ ...form, [key]: value })
 
   const handleSave = async () => {
     setSaving(true); setError(''); setSuccess('')
     try {
-      await updateSettings({ golden_window_minutes: goldenWindow })
+      const milestones = form.reward_milestones.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0)
+      await updateSettings({
+        golden_window_minutes: parseInt(form.golden_window_minutes) || 30,
+        kids_base_points: parseInt(form.kids_base_points) || 0,
+        kids_bonus_points: parseInt(form.kids_bonus_points) || 0,
+        adults_base_points: parseInt(form.adults_base_points) || 0,
+        adults_bonus_points: parseInt(form.adults_bonus_points) || 0,
+        reward_milestones: milestones,
+      })
       setSuccess('تم حفظ الإعدادات بنجاح')
     } catch (err) { setError(err.response?.data?.detail || 'فشل في حفظ الإعدادات') }
     finally { setSaving(false) }
@@ -630,36 +656,67 @@ function SettingsManagement() {
       <div className="card space-y-4">
         <h3 className="font-bold font-cairo text-lg">⚙️ الإعدادات</h3>
 
+        {/* Golden Window */}
         <div>
-          <label className="block text-sm font-cairo text-gray-600 mb-1">مدة النافذة الذهبية (بالدقائق):</label>
-          <input
-            type="number"
-            value={goldenWindow}
-            onChange={(e) => setGoldenWindow(parseInt(e.target.value) || 30)}
-            className="input-field font-cairo"
-            min="1"
-            max="180"
-          />
-          <p className="text-xs text-gray-400 mt-1 font-cairo">
-            المدة المسموحة بعد الأذان لتسجيل الصلاة بنقاط كاملة. حالياً: {goldenWindow} دقيقة
-          </p>
+          <label className="block text-sm font-cairo text-gray-600 mb-1">⏱️ مدة النافذة الذهبية (بالدقائق):</label>
+          <input type="number" value={form.golden_window_minutes}
+            onChange={(e) => update('golden_window_minutes', e.target.value)}
+            className="input-field font-cairo" min="1" max="180" />
         </div>
 
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="btn-primary w-full font-cairo disabled:opacity-50"
-        >
+        <div className="border-t pt-4">
+          <h4 className="font-bold font-cairo mb-3">🔢 نقاط التقييم</h4>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="card bg-primary-50">
+              <label className="block text-xs font-cairo text-gray-600 mb-1">🧒 الأطفال - الأساسي</label>
+              <input type="number" value={form.kids_base_points}
+                onChange={(e) => update('kids_base_points', e.target.value)}
+                className="input-field font-cairo text-center" min="0" />
+            </div>
+            <div className="card bg-gold-50">
+              <label className="block text-xs font-cairo text-gray-600 mb-1">🧒 الأطفال - المكافأة</label>
+              <input type="number" value={form.kids_bonus_points}
+                onChange={(e) => update('kids_bonus_points', e.target.value)}
+                className="input-field font-cairo text-center" min="0" />
+            </div>
+            <div className="card bg-primary-50">
+              <label className="block text-xs font-cairo text-gray-600 mb-1">🧑 الكبار - الأساسي</label>
+              <input type="number" value={form.adults_base_points}
+                onChange={(e) => update('adults_base_points', e.target.value)}
+                className="input-field font-cairo text-center" min="0" />
+            </div>
+            <div className="card bg-gold-50">
+              <label className="block text-xs font-cairo text-gray-600 mb-1">🧑 الكبار - المكافأة</label>
+              <input type="number" value={form.adults_bonus_points}
+                onChange={(e) => update('adults_bonus_points', e.target.value)}
+                className="input-field font-cairo text-center" min="0" />
+            </div>
+          </div>
+
+          <div className="text-xs text-gray-400 mt-2 font-cairo">
+            الإجمالي: الأطفال {parseInt(form.kids_base_points) || 0} + {parseInt(form.kids_bonus_points) || 0} = {parseInt(form.kids_base_points || 0) + parseInt(form.kids_bonus_points || 0)} | 
+            الكبار {parseInt(form.adults_base_points) || 0} + {parseInt(form.adults_bonus_points) || 0} = {parseInt(form.adults_base_points || 0) + parseInt(form.adults_bonus_points || 0)}
+          </div>
+        </div>
+
+        <div className="border-t pt-4">
+          <h4 className="font-bold font-cairo mb-3">🏆 نقاط المكافأة ( milestones )</h4>
+          <div>
+            <label className="block text-xs font-cairo text-gray-600 mb-1">نقاط المكافأة (مفصولة بفاصلة):</label>
+            <input type="text" value={form.reward_milestones}
+              onChange={(e) => update('reward_milestones', e.target.value)}
+              className="input-field font-cairo" placeholder="50,100,150,200,300,500" />
+            <p className="text-xs text-gray-400 mt-1 font-cairo">
+              كلما وصل الطفل لهذه النقاط تنشأ مكافأة تلقائياً
+            </p>
+          </div>
+        </div>
+
+        <button onClick={handleSave} disabled={saving}
+          className="btn-primary w-full font-cairo disabled:opacity-50">
           {saving ? 'جاري الحفظ...' : '💾 حفظ الإعدادات'}
         </button>
-      </div>
-
-      <div className="card mt-4 space-y-3">
-        <h4 className="font-bold font-cairo">نقاط التقييم الحالية</h4>
-        <div className="text-sm font-cairo text-gray-600 space-y-1">
-          <p>🧒 الأطفال (أقل من 15 سنة): 5 نقاط أساسي + 3 نقاط مكافأة = 8 نقاط</p>
-          <p>🧑 الكبار (15 سنة فأكثر): 2 نقطة أساسي + 5 نقاط مكافأة = 7 نقاط</p>
-        </div>
       </div>
     </div>
   )

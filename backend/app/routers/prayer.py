@@ -7,6 +7,7 @@ from app.schemas import PrayerLogCreate, PrayerLogResponse, PrayerTimesResponse,
 from app.auth import get_current_user
 from app.config import settings
 from app.services.prayer_times import fetch_prayer_times
+from app.services.settings_helper import get_points_config, get_int_setting, get_reward_milestones
 
 router = APIRouter(prefix="/api/prayer", tags=["prayer"])
 
@@ -26,13 +27,15 @@ def log_prayer(
     db: Session = Depends(get_db),
 ):
     now = datetime.now(timezone.utc)
-    golden_window_end = req.prayer_time + timedelta(minutes=settings.GOLDEN_WINDOW_MINUTES)
+    pc = get_points_config(db)
+    gw = pc["golden_window_minutes"]
+    golden_window_end = req.prayer_time + timedelta(minutes=gw)
     is_within_window = now <= golden_window_end
 
     # Calculate points
     is_kid = current_user.age < 15
-    base = settings.KIDS_BASE_POINTS if is_kid else settings.ADULTS_BASE_POINTS
-    bonus = settings.KIDS_BONUS_POINTS if is_kid else settings.ADULTS_BONUS_POINTS
+    base = pc["kids_base_points"] if is_kid else pc["adults_base_points"]
+    bonus = pc["kids_bonus_points"] if is_kid else pc["adults_bonus_points"]
 
     points = base
     is_approved = True
@@ -64,7 +67,8 @@ def log_prayer(
 
     # Check reward milestones
     new_total = current_user.total_points + points
-    for milestone in settings.REWARD_MILESTONES:
+    milestones = get_reward_milestones(db)
+    for milestone in milestones:
         if new_total >= milestone > current_user.total_points:
             existing = db.query(RewardMilestone).filter(
                 RewardMilestone.user_id == current_user.id,
@@ -101,9 +105,16 @@ def get_my_logs(
 def get_prayer_settings(
     db: Session = Depends(get_db),
 ):
-    setting = db.query(AppSetting).filter(AppSetting.key == "golden_window_minutes").first()
-    gw = int(setting.value) if setting else settings.GOLDEN_WINDOW_MINUTES
-    return AppSettingResponse(golden_window_minutes=gw)
+    pc = get_points_config(db)
+    rm = get_reward_milestones(db)
+    return AppSettingResponse(
+        golden_window_minutes=pc["golden_window_minutes"],
+        kids_base_points=pc["kids_base_points"],
+        kids_bonus_points=pc["kids_bonus_points"],
+        adults_base_points=pc["adults_base_points"],
+        adults_bonus_points=pc["adults_bonus_points"],
+        reward_milestones=rm,
+    )
 
 
 @router.get("/rewards", response_model=list[RewardMilestoneResponse])

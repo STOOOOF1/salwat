@@ -20,6 +20,7 @@ export default function ChildDashboard() {
   const [rewardAlert, setRewardAlert] = useState(null)
   const [goldenState, setGoldenState] = useState({ remaining: null, status: 'none' })
   const [goldenWindow, setGoldenWindow] = useState(30)
+  const [pointsConfig, setPointsConfig] = useState({ kids_base_points: 5, kids_bonus_points: 3, adults_base_points: 2, adults_bonus_points: 5 })
   const [rank, setRank] = useState(null)
   const [now, setNow] = useState(new Date())
   const [prayerToggle, setPrayerToggle] = useState({
@@ -31,7 +32,7 @@ export default function ChildDashboard() {
   useEffect(() => {
     let c = false
     Promise.all([getPrayerTimes(user.region), getMyLogs(), getPrayerSettings()])
-      .then(([tr, lr, sr]) => { if (!c) { setPrayerTimes(tr.data); setLogs(lr.data); setGoldenWindow(sr.data.golden_window_minutes) } })
+      .then(([tr, lr, sr]) => { if (!c) { setPrayerTimes(tr.data); setLogs(lr.data); setGoldenWindow(sr.data.golden_window_minutes); setPointsConfig({ kids_base_points: sr.data.kids_base_points, kids_bonus_points: sr.data.kids_bonus_points, adults_base_points: sr.data.adults_base_points, adults_bonus_points: sr.data.adults_bonus_points }) } })
       .catch(() => {})
       .finally(() => { if (c) return; setLoading(false) })
     return () => { c = true }
@@ -250,8 +251,10 @@ export default function ChildDashboard() {
 
           {/* Points info */}
           <div className="mt-3 text-xs text-gray-400 font-cairo">
-            {isAdult ? '2 أساسي + 5 مكافأة = 7 نقاط' : '5 أساسي + 3 مكافأة = 8 نقاط'}
-            {golden.status !== 'golden' && ` (بدون مكافأة: ${isAdult ? '2' : '5'} نقاط)`}
+            {isAdult
+              ? `${pointsConfig.adults_base_points} أساسي + ${pointsConfig.adults_bonus_points} مكافأة = ${pointsConfig.adults_base_points + pointsConfig.adults_bonus_points} نقاط`
+              : `${pointsConfig.kids_base_points} أساسي + ${pointsConfig.kids_bonus_points} مكافأة = ${pointsConfig.kids_base_points + pointsConfig.kids_bonus_points} نقاط`}
+            {golden.status !== 'golden' && ` (بدون مكافأة: ${isAdult ? pointsConfig.adults_base_points : pointsConfig.kids_base_points} نقاط)`}
           </div>
         </div>
       )}

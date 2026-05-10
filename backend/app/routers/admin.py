@@ -12,6 +12,7 @@ from app.schemas import (
 )
 from app.auth import hash_pin, get_current_user, require_admin
 from app.config import settings
+from app.services.settings_helper import get_points_config, get_int_setting, set_setting, get_reward_milestones
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -208,8 +209,8 @@ def mark_attendance(
     admin: User = Depends(require_admin),
 ):
     now = datetime.now(timezone.utc)
-    setting = db.query(AppSetting).filter(AppSetting.key == "golden_window_minutes").first()
-    gw = int(setting.value) if setting else settings.GOLDEN_WINDOW_MINUTES
+    pc = get_points_config(db)
+    gw = pc["golden_window_minutes"]
 
     users = db.query(User).filter(User.id.in_(req.user_ids)).all()
     if not users:
@@ -245,8 +246,8 @@ def mark_attendance(
             continue
 
         is_kid = u.age < 15
-        base = settings.KIDS_BASE_POINTS if is_kid else settings.ADULTS_BASE_POINTS
-        bonus = settings.KIDS_BONUS_POINTS if is_kid else settings.ADULTS_BONUS_POINTS
+        base = pc["kids_base_points"] if is_kid else pc["adults_base_points"]
+        bonus = pc["kids_bonus_points"] if is_kid else pc["adults_bonus_points"]
         points = base + bonus if is_within else base
         approved = is_within
 
@@ -276,9 +277,16 @@ def get_settings(
     db: Session = Depends(get_db),
     _=Depends(require_admin),
 ):
-    setting = db.query(AppSetting).filter(AppSetting.key == "golden_window_minutes").first()
-    value = int(setting.value) if setting else settings.GOLDEN_WINDOW_MINUTES
-    return {"golden_window_minutes": value}
+    pc = get_points_config(db)
+    rm = get_reward_milestones(db)
+    return {
+        "golden_window_minutes": pc["golden_window_minutes"],
+        "kids_base_points": pc["kids_base_points"],
+        "kids_bonus_points": pc["kids_bonus_points"],
+        "adults_base_points": pc["adults_base_points"],
+        "adults_bonus_points": pc["adults_bonus_points"],
+        "reward_milestones": rm,
+    }
 
 
 @router.put("/settings", response_model=dict)
@@ -287,17 +295,44 @@ def update_settings(
     db: Session = Depends(get_db),
     _=Depends(require_admin),
 ):
-    gw = req.get("golden_window_minutes", settings.GOLDEN_WINDOW_MINUTES)
-    if not isinstance(gw, int) or gw < 1 or gw > 180:
-        raise HTTPException(status_code=400, detail="Golden window must be 1-180 minutes")
+    # Validate and save each setting
+    if "golden_window_minutes" in req:
+        gw = req["golden_window_minutes"]
+        if not isinstance(gw, int) or gw < 1 or gw > 180:
+            raise HTTPException(status_code=400, detail="Golden window must be 1-180 minutes")
+        set_setting(db, "golden_window_minutes", str(gw))
 
-    setting = db.query(AppSetting).filter(AppSetting.key == "golden_window_minutes").first()
-    if setting:
-        setting.value = str(gw)
-    else:
-        db.add(AppSetting(key="golden_window_minutes", value=str(gw)))
-    db.commit()
-    return {"golden_window_minutes": gw}
+    if "kids_base_points" in req:
+        v = req["kids_base_points"]
+        if not isinstance(v, int) or v < 0:
+            raise HTTPException(status_code=400, detail="kids_base_points must be >= 0")
+        set_setting(db, "kids_base_points", str(v))
+
+    if "kids_bonus_points" in req:
+        v = req["kids_bonus_points"]
+        if not isinstance(v, int) or v < 0:
+            raise HTTPException(status_code=400, detail="kids_bonus_points must be >= 0")
+        set_setting(db, "kids_bonus_points", str(v))
+
+    if "adults_base_points" in req:
+        v = req["adults_base_points"]
+        if not isinstance(v, int) or v < 0:
+            raise HTTPException(status_code=400, detail="adults_base_points must be >= 0")
+        set_setting(db, "adults_base_points", str(v))
+
+    if "adults_bonus_points" in req:
+        v = req["adults_bonus_points"]
+        if not isinstance(v, int) or v < 0:
+            raise HTTPException(status_code=400, detail="adults_bonus_points must be >= 0")
+        set_setting(db, "adults_bonus_points", str(v))
+
+    if "reward_milestones" in req:
+        vm = req["reward_milestones"]
+        if not isinstance(vm, list) or not all(isinstance(x, int) and x > 0 for x in vm):
+            raise HTTPException(status_code=400, detail="reward_milestones must be a list of positive integers")
+        set_setting(db, "reward_milestones", ",".join(str(x) for x in sorted(vm)))
+
+    return get_settings(db, _=None)
 
 
 @router.get("/users-with-pins", response_model=list[UserWithPinResponse])

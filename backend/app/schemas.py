@@ -180,6 +180,11 @@ class AppSettingUpdate(BaseModel):
 
 class AppSettingResponse(BaseModel):
     golden_window_minutes: int
+    kids_base_points: int = 5
+    kids_bonus_points: int = 3
+    adults_base_points: int = 2
+    adults_bonus_points: int = 5
+    reward_milestones: list[int] = [50, 100, 150, 200, 300, 500]
 
 
 # ---------- Attendance ----------
