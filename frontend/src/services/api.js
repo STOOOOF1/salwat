@@ -80,6 +80,12 @@ export const getAllLogs = (pendingOnly = false) =>
 export const approveLog = (id, data) =>
   api.patch(`/admin/logs/${id}`, data)
 
+export const getUserLogs = (userId) =>
+  api.get(`/admin/users/${userId}/logs`)
+
+export const deleteLog = (logId) =>
+  api.delete(`/admin/logs/${logId}`)
+
 // User rewards
 export const getMyRewards = () => api.get('/prayer/rewards')
 
@@ -87,8 +93,8 @@ export const getMyRewards = () => api.get('/prayer/rewards')
 export const getRewards = (pendingOnly = true) =>
   api.get(`/admin/rewards?pending_only=${pendingOnly}`)
 
-export const approveReward = (id, is_approved) =>
-  api.patch(`/admin/rewards/${id}`, { is_approved })
+export const approveReward = (id, is_approved, description = null) =>
+  api.patch(`/admin/rewards/${id}`, { is_approved, description })
 
 // Admin - Attendance
 export const markAttendance = (prayer_name, user_ids, log_date = null) =>

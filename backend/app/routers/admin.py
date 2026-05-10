@@ -142,6 +142,42 @@ def approve_log(
     return r
 
 
+# ---- Child Log Record ----
+
+@router.get("/users/{user_id}/logs", response_model=list[PrayerLogResponse])
+def get_user_logs(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    logs = db.query(PrayerLog).filter(PrayerLog.user_id == user_id).order_by(PrayerLog.created_at.desc()).limit(100).all()
+    result = []
+    for log in logs:
+        r = PrayerLogResponse.model_validate(log)
+        r.user_name = log.user.first_name if log.user else ""
+        result.append(r)
+    return result
+
+
+@router.delete("/logs/{log_id}")
+def delete_log(
+    log_id: UUID,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    log = db.query(PrayerLog).filter(PrayerLog.id == log_id).first()
+    if not log:
+        raise HTTPException(status_code=404, detail="Log not found")
+    points = log.points_awarded
+    was_approved = log.is_approved
+    user = log.user
+    db.delete(log)
+    if was_approved and user:
+        user.total_points = max(0, user.total_points - points)
+    db.commit()
+    return {"message": "تم حذف التسجيل"}
+
+
 # ---- Reward Management ----
 
 @router.get("/rewards", response_model=list[RewardMilestoneResponse])
@@ -174,6 +210,8 @@ def approve_reward(
         raise HTTPException(status_code=404, detail="Reward not found")
     rw.is_approved = req.is_approved
     rw.approved_by = admin.id
+    if req.description is not None:
+        rw.description = req.description
     from datetime import datetime, timezone
     rw.approved_at = datetime.now(timezone.utc) if req.is_approved else None
     db.commit()

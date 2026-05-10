@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { getPrayerTimes, logPrayer, getMyLogs, getPrayerSettings, getLeaderboard, getMe } from '../services/api'
+import { getPrayerTimes, logPrayer, getMyLogs, getMyRewards, getPrayerSettings, getLeaderboard, getMe } from '../services/api'
 import { fmtTime } from '../utils/date'
 
 const PRAYER_NAMES = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']
@@ -15,6 +15,7 @@ export default function ChildDashboard() {
   const [logging, setLogging] = useState(null)
   const [error, setError] = useState('')
   const [successLog, setSuccessLog] = useState('')
+  const [rewardMsg, setRewardMsg] = useState('')
   const [goldenState, setGoldenState] = useState({ remaining: null, status: 'none' })
   const [goldenWindow, setGoldenWindow] = useState(30)
   const [pointsConfig, setPointsConfig] = useState({ kids_base_points: 5, kids_bonus_points: 3, adults_base_points: 2, adults_bonus_points: 5 })
@@ -36,6 +37,16 @@ export default function ChildDashboard() {
   }, [user.region])
 
   useEffect(() => { const i = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(i) }, [])
+
+  // Check approved rewards once on mount
+  useEffect(() => {
+    getMyRewards().then(res => {
+      const approved = res.data.find(r => r.is_approved)
+      if (approved) {
+        setRewardMsg(approved.description || `🎯 مكافأة ${approved.milestone_points} نقطة!`)
+      }
+    }).catch(() => {})
+  }, [])
 
   // ---- Rank ----
   useEffect(() => {
@@ -154,6 +165,7 @@ export default function ChildDashboard() {
 
       {/* Simple notifications */}
       {successLog && <div className="bg-green-50 text-green-700 p-3 rounded-xl text-sm text-center font-cairo border border-green-200">{successLog}</div>}
+      {rewardMsg && <div className="bg-gold-50 text-gold-700 p-3 rounded-xl text-sm text-center font-cairo border border-gold-200">{rewardMsg}</div>}
       {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm text-center font-cairo border border-red-200">{error}</div>}
 
       {/* ===== CURRENT PRAYER HERO ===== */}

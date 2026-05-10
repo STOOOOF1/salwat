@@ -149,6 +149,7 @@ class RewardMilestoneResponse(BaseModel):
     user_id: UUID
     user_name: str = ""
     milestone_points: int
+    description: Optional[str] = None
     is_approved: bool
     created_at: datetime
 
@@ -158,6 +159,7 @@ class RewardMilestoneResponse(BaseModel):
 
 class RewardApproveRequest(BaseModel):
     is_approved: bool
+    description: Optional[str] = None
 
 
 # ---------- Prayer Times ----------

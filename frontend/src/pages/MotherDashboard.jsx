@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import {
   getUsers, createUser, updateUser, deleteUser, resetUserPin, resetUserPoints,
-  getAllLogs, approveLog,
+  getAllLogs, approveLog, getUserLogs, deleteLog,
   getRewards, approveReward,
   toggleLeaderboard,
   markAttendance,
@@ -74,6 +74,9 @@ function UserManagement() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [menuOpen, setMenuOpen] = useState(null)
+  const [recordUser, setRecordUser] = useState(null)
+  const [recordLogs, setRecordLogs] = useState([])
+  const [recordLoading, setRecordLoading] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -165,6 +168,26 @@ function UserManagement() {
       setSuccess(`تم تغيير إظهار المتصدرين لـ ${name}`)
       fetchUsers()
     } catch { setError('فشل في تغيير الإعداد') }
+  }
+
+  const openRecord = async (u) => {
+    setMenuOpen(null); setRecordLoading(true); setRecordUser(u)
+    try {
+      const res = await getUserLogs(u.id)
+      setRecordLogs(res.data)
+    } catch { setError('فشل في تحميل السجل') }
+    finally { setRecordLoading(false) }
+  }
+
+  const handleDeleteLog = async (logId) => {
+    if (!window.confirm('هل أنت متأكدة من حذف هذا التسجيل؟')) return
+    try {
+      await deleteLog(logId)
+      setSuccess('تم حذف التسجيل')
+      const res = await getUserLogs(recordUser.id)
+      setRecordLogs(res.data)
+      fetchUsers()
+    } catch { setError('فشل في الحذف') }
   }
 
   // Close menu on outside click
@@ -263,6 +286,10 @@ function UserManagement() {
                     {u.show_leaderboard ? '🏆 إخفاء المتصدرين' : '🏆 إظهار المتصدرين'}
                   </button>
                   <div className="border-t border-gray-100 my-1" />
+                  <button onClick={() => openRecord(u)} className="w-full text-right px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 font-cairo flex items-center gap-2">
+                    📋 السجل
+                  </button>
+                  <div className="border-t border-gray-100 my-1" />
                   <button onClick={() => { setMenuOpen(null); handleDelete(u.id, u.first_name) }} className="w-full text-right px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-cairo flex items-center gap-2">
                     🗑️ حذف
                   </button>
@@ -272,6 +299,42 @@ function UserManagement() {
           </div>
         ))}
       </div>
+
+      {/* Record Modal */}
+      {recordUser && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setRecordUser(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold font-cairo text-lg">📋 سجل {recordUser.first_name}</h3>
+              <button onClick={() => setRecordUser(null)} className="text-gray-400 text-xl hover:text-gray-600">✕</button>
+            </div>
+            {recordLoading ? (
+              <div className="text-center py-8 text-gray-400 font-cairo">جاري التحميل...</div>
+            ) : recordLogs.length === 0 ? (
+              <p className="text-center py-8 text-gray-400 font-cairo">لا توجد تسجيلات</p>
+            ) : (
+              <div className="space-y-2">
+                {recordLogs.map(log => (
+                  <div key={log.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 text-sm">
+                    <div className="flex items-center gap-2 font-cairo">
+                      <span>{PRAYER_ICONS[log.prayer_name]}</span>
+                      <span className="font-bold">{PRAYER_LABELS[log.prayer_name]}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${log.is_approved ? 'bg-green-100 text-green-700' : 'bg-gold-100 text-gold-700'}`}>
+                        {log.is_approved ? 'مقبول' : 'قيد الانتظار'}
+                      </span>
+                      <span className="text-xs text-gray-400">{fmtHijri(log.created_at)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-primary-600 font-bold">+{log.points_awarded}</span>
+                      <button onClick={() => handleDeleteLog(log.id)} className="text-red-400 hover:text-red-600 text-lg">🗑️</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -443,6 +506,8 @@ function RewardManagement() {
   const [rewards, setRewards] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [rewardDescriptions, setRewardDescriptions] = useState({})
 
   const fetchRewards = useCallback(() => {
     let cancelled = false
@@ -455,11 +520,42 @@ function RewardManagement() {
     return cleanup
   }, [fetchRewards])
 
+  useEffect(() => { setSelectedIds(new Set()) }, [rewards])
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const n = new Set(prev)
+      if (n.has(id)) n.delete(id); else n.add(id)
+      return n
+    })
+  }
+
+  const selectAll = () => {
+    if (selectedIds.size === rewards.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(rewards.map(r => r.id)))
+    }
+  }
+
   const handleApprove = async (id, isApproved) => {
     try {
-      await approveReward(id, isApproved)
+      const desc = rewardDescriptions[id] || null
+      await approveReward(id, isApproved, desc)
+      setRewardDescriptions(prev => { const n = { ...prev }; delete n[id]; return n })
       fetchRewards()
     } catch { setError('فشل في تحديث المكافأة') }
+  }
+
+  const approveSelected = async () => {
+    for (const id of selectedIds) {
+      try {
+        const desc = rewardDescriptions[id] || null
+        await approveReward(id, true, desc)
+      } catch {}
+    }
+    setRewardDescriptions({})
+    fetchRewards()
   }
 
   if (loading) return <div className="text-center py-8 text-gray-400 font-cairo">جاري التحميل...</div>
@@ -467,6 +563,22 @@ function RewardManagement() {
   return (
     <div>
       {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl mb-3 text-sm font-cairo">{error}</div>}
+
+      {rewards.length > 1 && (
+        <div className="flex items-center justify-between mb-4">
+          <label className="flex items-center gap-2 cursor-pointer font-cairo text-sm">
+            <input type="checkbox" checked={selectedIds.size === rewards.length && rewards.length > 0}
+              onChange={selectAll} className="w-4 h-4" />
+            <span>تحديد الكل</span>
+          </label>
+          {selectedIds.size > 0 && (
+            <button onClick={approveSelected}
+              className="px-4 py-2 rounded-xl text-sm font-bold font-cairo bg-green-600 text-white hover:bg-green-700">
+              ✓ اعتماد الكل ({selectedIds.size})
+            </button>
+          )}
+        </div>
+      )}
 
       {rewards.length === 0 ? (
         <div className="card text-center py-8">
@@ -477,19 +589,27 @@ function RewardManagement() {
       ) : (
         <div className="space-y-3">
           {rewards.map((rw) => (
-            <div key={rw.id} className="card">
+            <div key={rw.id} className={`card ${selectedIds.has(rw.id) ? 'ring-2 ring-green-400' : ''}`}>
               <div className="flex items-center justify-between mb-2">
-                <div>
-                  <div className="font-bold font-cairo">{rw.user_name}</div>
-                  <div className="text-sm text-gray-500 font-cairo">
-                    🎯 وصل إلى {rw.milestone_points} نقطة!
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" checked={selectedIds.has(rw.id)}
+                    onChange={() => toggleSelect(rw.id)} className="w-4 h-4" />
+                  <div>
+                    <div className="font-bold font-cairo">{rw.user_name}</div>
+                    <div className="text-sm text-gray-500 font-cairo">
+                      🎯 وصل إلى {rw.milestone_points} نقطة!
+                    </div>
                   </div>
                 </div>
                 <span className="text-3xl">🏆</span>
               </div>
-              <div className="text-xs text-gray-400 font-cairo mb-3">
+              <div className="text-xs text-gray-400 font-cairo mb-2">
                 {fmtHijri(rw.created_at)}
               </div>
+              <input type="text" placeholder="وصف المكافأة (اختياري)"
+                value={rewardDescriptions[rw.id] ?? ''}
+                onChange={(e) => setRewardDescriptions({ ...rewardDescriptions, [rw.id]: e.target.value })}
+                className="input-field font-cairo text-sm mb-3" />
               <button
                 onClick={() => handleApprove(rw.id, true)}
                 className="btn-gold w-full font-cairo text-lg"

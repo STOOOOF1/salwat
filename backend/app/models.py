@@ -81,6 +81,7 @@ class RewardMilestone(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     milestone_points = Column(Integer, nullable=False)
+    description = Column(Text, nullable=True)
     is_approved = Column(Boolean, default=False)
     approved_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     approved_at = Column(DateTime(timezone=True), nullable=True)

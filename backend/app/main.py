@@ -9,13 +9,23 @@ from app.services.cron import init_scheduler
 # Create tables
 Base.metadata.create_all(bind=engine)
 
-# Migration: add show_leaderboard column if missing
+# Migration: add columns if missing
 with engine.connect() as conn:
     try:
         conn.execute(text("ALTER TABLE users ADD COLUMN show_leaderboard BOOLEAN DEFAULT TRUE"))
         conn.commit()
     except Exception:
-        conn.rollback()  # column already exists
+        conn.rollback()
+    try:
+        conn.execute(text("UPDATE users SET show_leaderboard = TRUE WHERE show_leaderboard IS NULL"))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+    try:
+        conn.execute(text("ALTER TABLE reward_milestones ADD COLUMN description TEXT"))
+        conn.commit()
+    except Exception:
+        conn.rollback()
 
 # Create triggers (defined in schema.sql) - idempotent
 with engine.connect() as conn:

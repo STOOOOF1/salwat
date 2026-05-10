@@ -36,7 +36,7 @@ def get_leaderboard(
         .filter(User.role == "user")
         .all()
     )
-    filtered = [u for u in users if u.category == category and u.show_leaderboard]
+    filtered = [u for u in users if u.category == category and u.show_leaderboard is not False]
     filtered.sort(key=lambda u: u.total_points, reverse=True)
     week_start, week_end = get_week_range()
     entries = [
