@@ -31,7 +31,7 @@ def fetch_prayer_times(region: str, date_str: str | None = None) -> dict:
             data = resp.json()
 
         timings = data.get("data", {}).get("timings", {})
-        date_info = data.get("data", {}).get("date", {}).get("readable", today)
+        date_info = data.get("data", {}).get("date", {}).get("readable", day)
 
         return {
             "date": date_info,
