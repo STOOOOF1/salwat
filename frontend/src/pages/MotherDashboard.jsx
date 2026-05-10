@@ -647,6 +647,17 @@ function SettingsManagement() {
     finally { setSaving(false) }
   }
 
+  const handleResetWeek = async () => {
+    if (!window.confirm('⚠️ هل أنت متأكدة؟ سيتم أرشفة بيانات هذا الأسبوع وتصفير نقاط الجميع إلى 0!')) return
+    if (!window.confirm('❗ تأكيد نهائي: تصفير الأسبوع ونقل البيانات للأرشيف؟')) return
+    setResetting(true); setError(''); setSuccess('')
+    try {
+      const res = await resetWeek()
+      setSuccess(res.data.message)
+    } catch (err) { setError(err.response?.data?.detail || 'فشل في تصفير الأسبوع') }
+    finally { setResetting(false) }
+  }
+
   if (loading) return <div className="text-center py-8 text-gray-400 font-cairo">جاري التحميل...</div>
 
   return (
