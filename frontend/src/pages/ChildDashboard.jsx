@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { getPrayerTimes, logPrayer, getMyLogs } from '../services/api'
+import { getPrayerTimes, logPrayer, getMyLogs, getPrayerSettings } from '../services/api'
 import { fmtHijri, fmtTime } from '../utils/date'
 import Celebration from '../components/Celebration'
 
 const PRAYER_NAMES = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']
 const PRAYER_LABELS = { Fajr: 'الفجر', Dhuhr: 'الظهر', Asr: 'العصر', Maghrib: 'المغرب', Isha: 'العشاء' }
 const PRAYER_ICONS = { Fajr: '🌅', Dhuhr: '☀️', Asr: '🌤', Maghrib: '🌅', Isha: '🌙' }
-const GOLDEN_WINDOW_MINUTES = 30
 
 export default function ChildDashboard() {
   const { user, refreshUser } = useAuth()
@@ -20,6 +19,7 @@ export default function ChildDashboard() {
   const [celebrationMsg, setCelebrationMsg] = useState('')
   const [rewardAlert, setRewardAlert] = useState(null)
   const [goldenState, setGoldenState] = useState({ remaining: null, status: 'none' })
+  const [goldenWindow, setGoldenWindow] = useState(30)
   const [rank, setRank] = useState(null)
   const [now, setNow] = useState(new Date())
   const [prayerToggle, setPrayerToggle] = useState({
@@ -30,8 +30,8 @@ export default function ChildDashboard() {
   // ---- Data fetching ----
   useEffect(() => {
     let c = false
-    Promise.all([getPrayerTimes(user.region), getMyLogs()])
-      .then(([tr, lr]) => { if (!c) { setPrayerTimes(tr.data); setLogs(lr.data) } })
+    Promise.all([getPrayerTimes(user.region), getMyLogs(), getPrayerSettings()])
+      .then(([tr, lr, sr]) => { if (!c) { setPrayerTimes(tr.data); setLogs(lr.data); setGoldenWindow(sr.data.golden_window_minutes) } })
       .catch(() => {})
       .finally(() => { if (c) return; setLoading(false) })
     return () => { c = true }
@@ -130,7 +130,7 @@ export default function ChildDashboard() {
 
     const nowMs = now.getTime()
     const prayerMs = info.time.getTime()
-    const windowEnd = prayerMs + GOLDEN_WINDOW_MINUTES * 60000
+    const windowEnd = prayerMs + goldenWindow * 60000
     const diff = Math.floor((windowEnd - nowMs) / 1000)
 
     if (info.logged) return { remaining: null, status: 'done' }
@@ -163,10 +163,12 @@ export default function ChildDashboard() {
           <div className="text-sm text-gray-500 font-cairo">نقاطي</div>
           <div className="text-3xl font-bold text-primary-600 font-cairo">{user.total_points}</div>
         </div>
-        <div className="text-left">
-          <div className="text-sm text-gray-500 font-cairo">الترتيب</div>
-          <div className="text-2xl font-bold text-gold-600 font-cairo">{rank ? `#${rank}` : '-'}</div>
-        </div>
+        {user.show_leaderboard && (
+          <div className="text-left">
+            <div className="text-sm text-gray-500 font-cairo">الترتيب</div>
+            <div className="text-2xl font-bold text-gold-600 font-cairo">{rank ? `#${rank}` : '-'}</div>
+          </div>
+        )}
       </div>
 
       {/* Errors & alerts */}

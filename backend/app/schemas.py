@@ -64,6 +64,7 @@ class UserResponse(BaseModel):
     role: str
     total_points: int
     category: str
+    show_leaderboard: bool = True
     created_at: datetime
 
     class Config:
@@ -169,3 +170,28 @@ class PrayerTimesResponse(BaseModel):
     Asr: str
     Maghrib: str
     Isha: str
+
+
+# ---------- Settings ----------
+
+class AppSettingUpdate(BaseModel):
+    golden_window_minutes: int = Field(default=30, ge=1, le=180)
+
+
+class AppSettingResponse(BaseModel):
+    golden_window_minutes: int
+
+
+# ---------- Attendance ----------
+
+class AttendanceRecord(BaseModel):
+    user_id: UUID
+    prayer_name: str
+    prayer_time: datetime
+    is_congregation: bool = False
+    is_early_time: bool = False
+
+
+class AttendanceRequest(BaseModel):
+    prayer_name: str
+    user_ids: list[UUID]

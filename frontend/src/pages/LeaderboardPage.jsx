@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../context/AuthContext'
 import { getLeaderboard, getArchivedWeeks, getArchivedLeaderboard } from '../services/api'
 
 const RANK_MEDALS = { 1: '🥇', 2: '🥈', 3: '🥉' }
 
 export default function LeaderboardPage() {
+  const { user } = useAuth()
   const [category, setCategory] = useState('Kids')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -36,6 +38,17 @@ export default function LeaderboardPage() {
 
   const loadArchive = (week) => {
     setSelectedWeek(prev => prev?.week_start === week.week_start && prev?.category === week.category ? null : week)
+  }
+
+  // Check if leaderboard is hidden for this child
+  if (user?.role !== 'admin' && user?.show_leaderboard === false) {
+    return (
+      <div className="card text-center py-12">
+        <div className="text-5xl mb-4">🔒</div>
+        <h1 className="text-2xl font-bold font-cairo text-gray-500">المتصدرون مخفيون</h1>
+        <p className="text-gray-400 font-cairo mt-2">لقد قامت الأم بإخفاء لوحة المتصدرين مؤقتاً</p>
+      </div>
+    )
   }
 
   return (

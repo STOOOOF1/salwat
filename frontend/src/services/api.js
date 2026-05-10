@@ -70,6 +70,9 @@ export const resetUserPin = (id, new_pin) =>
 export const resetUserPoints = (id) =>
   api.post(`/admin/users/${id}/reset-points`)
 
+export const toggleLeaderboard = (id) =>
+  api.post(`/admin/users/${id}/toggle-leaderboard`)
+
 // Admin - Logs
 export const getAllLogs = (pendingOnly = false) =>
   api.get(`/admin/logs?pending_only=${pendingOnly}`)
@@ -86,6 +89,18 @@ export const getRewards = (pendingOnly = true) =>
 
 export const approveReward = (id, is_approved) =>
   api.patch(`/admin/rewards/${id}`, { is_approved })
+
+// Admin - Attendance
+export const markAttendance = (prayer_name, user_ids) =>
+  api.post('/admin/attendance', { prayer_name, user_ids })
+
+// Admin - Settings
+export const getAdminSettings = () => api.get('/admin/settings')
+
+export const updateSettings = (data) => api.put('/admin/settings', data)
+
+// Public - Settings
+export const getPrayerSettings = () => api.get('/prayer/settings')
 
 // Archive
 export const getArchivedWeeks = () => api.get('/archive/weeks')

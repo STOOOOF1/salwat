@@ -1,15 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from uuid import UUID
+from datetime import datetime, timezone, timedelta
 from app.database import get_db
-from app.models import User, PrayerLog, RewardMilestone
+from app.models import User, PrayerLog, RewardMilestone, AppSetting
 from app.schemas import (
     UserCreate, UserUpdate, UserResponse, UserWithPinResponse,
     PrayerLogResponse, PrayerLogApprove,
     RewardMilestoneResponse, RewardApproveRequest,
-    PinResetRequest,
+    PinResetRequest, AttendanceRequest,
 )
 from app.auth import hash_pin, get_current_user, require_admin
+from app.config import settings
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -178,3 +180,147 @@ def approve_reward(
     r = RewardMilestoneResponse.model_validate(rw)
     r.user_name = rw.user.first_name if rw.user else ""
     return r
+
+
+# ---- Leaderboard Visibility ----
+
+@router.post("/users/{user_id}/toggle-leaderboard", response_model=UserResponse)
+def toggle_leaderboard(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.show_leaderboard = not user.show_leaderboard
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+# ---- Attendance (تحضير) ----
+
+@router.post("/attendance")
+def mark_attendance(
+    req: AttendanceRequest,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    now = datetime.now(timezone.utc)
+    setting = db.query(AppSetting).filter(AppSetting.key == "golden_window_minutes").first()
+    gw = int(setting.value) if setting else settings.GOLDEN_WINDOW_MINUTES
+
+    users = db.query(User).filter(User.id.in_(req.user_ids)).all()
+    if not users:
+        raise HTTPException(status_code=404, detail="Users not found")
+
+    region = users[0].region
+    from app.services.prayer_times import fetch_prayer_times
+    times = fetch_prayer_times(region)
+    if "error" in times:
+        raise HTTPException(status_code=502, detail=times["error"])
+
+    pt_str = times.get(req.prayer_name)
+    if not pt_str:
+        raise HTTPException(status_code=400, detail="Invalid prayer name")
+
+    h, m = map(int, pt_str.split(":"))
+    # Aladhan API returns local Saudi time (UTC+3), convert to UTC
+    sa_tz = timezone(timedelta(hours=3))
+    now_sa = datetime.now(sa_tz)
+    prayer_sa = now_sa.replace(hour=h, minute=m, second=0, microsecond=0)
+    prayer_dt = prayer_sa.astimezone(timezone.utc)
+    golden_end = prayer_dt + timedelta(minutes=gw)
+    is_within = now <= golden_end
+
+    created = []
+    for u in users:
+        existing = db.query(PrayerLog).filter(
+            PrayerLog.user_id == u.id,
+            PrayerLog.prayer_name == req.prayer_name,
+            PrayerLog.prayer_time == prayer_dt,
+        ).first()
+        if existing:
+            continue
+
+        is_kid = u.age < 15
+        base = settings.KIDS_BASE_POINTS if is_kid else settings.ADULTS_BASE_POINTS
+        bonus = settings.KIDS_BONUS_POINTS if is_kid else settings.ADULTS_BONUS_POINTS
+        points = base + bonus if is_within else base
+        approved = is_within
+
+        log = PrayerLog(
+            user_id=u.id,
+            prayer_name=req.prayer_name,
+            logged_at=now,
+            prayer_time=prayer_dt,
+            is_within_golden_window=is_within,
+            is_congregation=u.gender == "Male",
+            is_early_time=u.gender == "Female",
+            points_awarded=points,
+            is_approved=approved,
+            approved_by=admin.id,
+        )
+        db.add(log)
+        created.append(log)
+
+    db.commit()
+    return {"message": f"تم تسجيل {len(created)} أطفال", "count": len(created)}
+
+
+# ---- Settings ----
+
+@router.get("/settings", response_model=dict)
+def get_settings(
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    setting = db.query(AppSetting).filter(AppSetting.key == "golden_window_minutes").first()
+    value = int(setting.value) if setting else settings.GOLDEN_WINDOW_MINUTES
+    return {"golden_window_minutes": value}
+
+
+@router.put("/settings", response_model=dict)
+def update_settings(
+    req: dict,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    gw = req.get("golden_window_minutes", settings.GOLDEN_WINDOW_MINUTES)
+    if not isinstance(gw, int) or gw < 1 or gw > 180:
+        raise HTTPException(status_code=400, detail="Golden window must be 1-180 minutes")
+
+    setting = db.query(AppSetting).filter(AppSetting.key == "golden_window_minutes").first()
+    if setting:
+        setting.value = str(gw)
+    else:
+        db.add(AppSetting(key="golden_window_minutes", value=str(gw)))
+    db.commit()
+    return {"golden_window_minutes": gw}
+
+
+@router.get("/users-with-pins", response_model=list[UserWithPinResponse])
+def list_users_with_pins(
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    users = db.query(User).order_by(User.created_at.desc()).all()
+    result = []
+    from app.auth import verify_pin
+    for u in users:
+        r = UserWithPinResponse(
+            id=u.id,
+            first_name=u.first_name,
+            age=u.age,
+            gender=u.gender,
+            region=u.region,
+            role=u.role,
+            total_points=u.total_points,
+            category=u.category,
+            show_leaderboard=u.show_leaderboard,
+            created_at=u.created_at,
+            pin="",
+        )
+        result.append(r)
+    return result

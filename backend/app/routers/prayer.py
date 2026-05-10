@@ -2,8 +2,8 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import User, PrayerLog, RewardMilestone
-from app.schemas import PrayerLogCreate, PrayerLogResponse, PrayerTimesResponse, RewardMilestoneResponse
+from app.models import User, PrayerLog, RewardMilestone, AppSetting
+from app.schemas import PrayerLogCreate, PrayerLogResponse, PrayerTimesResponse, RewardMilestoneResponse, AppSettingResponse
 from app.auth import get_current_user
 from app.config import settings
 from app.services.prayer_times import fetch_prayer_times
@@ -95,6 +95,15 @@ def get_my_logs(
         .all()
     )
     return logs
+
+
+@router.get("/settings", response_model=AppSettingResponse)
+def get_prayer_settings(
+    db: Session = Depends(get_db),
+):
+    setting = db.query(AppSetting).filter(AppSetting.key == "golden_window_minutes").first()
+    gw = int(setting.value) if setting else settings.GOLDEN_WINDOW_MINUTES
+    return AppSettingResponse(golden_window_minutes=gw)
 
 
 @router.get("/rewards", response_model=list[RewardMilestoneResponse])

@@ -4,9 +4,13 @@ import {
   getUsers, createUser, updateUser, deleteUser, resetUserPin, resetUserPoints,
   getAllLogs, approveLog,
   getRewards, approveReward,
+  toggleLeaderboard,
+  markAttendance,
+  getAdminSettings, updateSettings,
 } from '../services/api'
-import { fmtHijri } from '../utils/date'
+import { fmtHijri, fmtTime } from '../utils/date'
 
+const PRAYER_NAMES = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']
 const PRAYER_LABELS = { Fajr: 'الفجر', Dhuhr: 'الظهر', Asr: 'العصر', Maghrib: 'المغرب', Isha: 'العشاء' }
 const PRAYER_ICONS = { Fajr: '🌅', Dhuhr: '☀️', Asr: '🌤', Maghrib: '🌅', Isha: '🌙' }
 
@@ -26,11 +30,13 @@ export default function MotherDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="flex rounded-xl bg-gray-100 p-1 gap-1">
+      <div className="flex rounded-xl bg-gray-100 p-1 gap-1 flex-wrap">
         {[
           { key: 'users', label: 'الأطفال', icon: '👶' },
           { key: 'logs', label: 'التسجيلات', icon: '📝' },
           { key: 'rewards', label: 'المكافآت', icon: '🎁' },
+          { key: 'attendance', label: 'تحضير', icon: '📋' },
+          { key: 'settings', label: 'الإعدادات', icon: '⚙️' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -50,6 +56,8 @@ export default function MotherDashboard() {
       {activeTab === 'users' && <UserManagement />}
       {activeTab === 'logs' && <LogManagement />}
       {activeTab === 'rewards' && <RewardManagement />}
+      {activeTab === 'attendance' && <AttendanceManagement />}
+      {activeTab === 'settings' && <SettingsManagement />}
     </div>
   )
 }
@@ -147,6 +155,14 @@ function UserManagement() {
     } catch { setError('فشل في تصفير النقاط') }
   }
 
+  const handleToggleLeaderboard = async (id, name) => {
+    try {
+      await toggleLeaderboard(id)
+      setSuccess(`تم تغيير إظهار المتصدرين لـ ${name}`)
+      fetchUsers()
+    } catch { setError('فشل في تغيير الإعداد') }
+  }
+
   if (loading) return <div className="text-center py-8 text-gray-400 font-cairo">جاري التحميل...</div>
 
   return (
@@ -229,10 +245,13 @@ function UserManagement() {
               </div>
               <div className="text-primary-600 font-bold font-cairo">{u.total_points} نقطة</div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <button onClick={() => openEdit(u)} className="text-sm text-blue-600 hover:text-blue-800 font-cairo">تعديل</button>
               <button onClick={() => handleResetPin(u.id)} className="text-sm text-gold-600 hover:text-gold-800 font-cairo">PIN</button>
               <button onClick={() => handleResetPoints(u.id, u.first_name)} className="text-sm text-orange-600 hover:text-orange-800 font-cairo">تصفير</button>
+              <button onClick={() => handleToggleLeaderboard(u.id, u.first_name)} className={`text-sm font-cairo ${u.show_leaderboard ? 'text-green-600 hover:text-green-800' : 'text-gray-400 hover:text-gray-600'}`}>
+                {u.show_leaderboard ? '🏆 ظاهر' : '🏆 مخفي'}
+              </button>
               <button onClick={() => handleDelete(u.id, u.first_name)} className="text-sm text-red-600 hover:text-red-800 font-cairo">حذف</button>
             </div>
           </div>
@@ -247,6 +266,9 @@ function LogManagement() {
   const [loading, setLoading] = useState(true)
   const [pendingOnly, setPendingOnly] = useState(true)
   const [error, setError] = useState('')
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [approvingId, setApprovingId] = useState(null)
+  const [customPoints, setCustomPoints] = useState({})
 
   const fetchLogs = useCallback(() => {
     let cancelled = false; setLoading(true)
@@ -259,11 +281,50 @@ function LogManagement() {
     return cleanup
   }, [fetchLogs])
 
+  useEffect(() => { setSelectedIds(new Set()) }, [logs])
+
   const handleApprove = async (logId, isApproved) => {
+    setApprovingId(logId)
     try {
-      await approveLog(logId, { is_approved: isApproved })
+      const data = { is_approved: isApproved }
+      if (customPoints[logId] !== undefined && customPoints[logId] !== '') {
+        data.override_points = parseInt(customPoints[logId])
+      }
+      await approveLog(logId, data)
+      setCustomPoints(prev => { const n = { ...prev }; delete n[logId]; return n })
       fetchLogs()
     } catch { setError('فشل في تحديث التسجيل') }
+    finally { setApprovingId(null) }
+  }
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const n = new Set(prev)
+      if (n.has(id)) n.delete(id); else n.add(id)
+      return n
+    })
+  }
+
+  const selectAll = () => {
+    if (selectedIds.size === logs.filter(l => !l.is_approved).length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(logs.filter(l => !l.is_approved).map(l => l.id)))
+    }
+  }
+
+  const approveSelected = async () => {
+    for (const id of selectedIds) {
+      try {
+        const data = { is_approved: true }
+        if (customPoints[id] !== undefined && customPoints[id] !== '') {
+          data.override_points = parseInt(customPoints[id])
+        }
+        await approveLog(id, data)
+      } catch { }
+    }
+    setCustomPoints({})
+    fetchLogs()
   }
 
   if (loading) return <div className="text-center py-8 text-gray-400 font-cairo">جاري التحميل...</div>
@@ -282,16 +343,44 @@ function LogManagement() {
         <span>تسجيلات بانتظار المراجعة فقط</span>
       </label>
 
+      {selectedIds.size > 0 && (
+        <button
+          onClick={approveSelected}
+          className="btn-primary w-full mb-4 font-cairo bg-green-600"
+        >
+          ✓ قبول الكل ({selectedIds.size})
+        </button>
+      )}
+
       {logs.length === 0 ? (
         <p className="text-gray-400 text-center py-8 font-cairo">
           {pendingOnly ? 'لا توجد تسجيلات بانتظار المراجعة' : 'لا توجد تسجيلات'}
         </p>
       ) : (
         <div className="space-y-3">
+          {logs.filter(l => !l.is_approved).length > 1 && (
+            <label className="flex items-center gap-2 mb-2 cursor-pointer font-cairo text-sm">
+              <input
+                type="checkbox"
+                checked={selectedIds.size === logs.filter(l => !l.is_approved).length && logs.filter(l => !l.is_approved).length > 0}
+                onChange={selectAll}
+                className="w-4 h-4"
+              />
+              <span>تحديد الكل للقبول</span>
+            </label>
+          )}
           {logs.map((log) => (
-            <div key={log.id} className="card">
+            <div key={log.id} className={`card ${!log.is_approved && selectedIds.has(log.id) ? 'border-2 border-green-400' : ''}`}>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2 font-cairo">
+                  {!log.is_approved && (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(log.id)}
+                      onChange={() => toggleSelect(log.id)}
+                      className="w-4 h-4 ml-1"
+                    />
+                  )}
                   <span className="text-lg">{PRAYER_ICONS[log.prayer_name]}</span>
                   <span className="font-bold">{log.user_name || 'مستخدم'}</span>
                   <span className="text-primary-600 font-bold">+{log.points_awarded}</span>
@@ -311,19 +400,34 @@ function LogManagement() {
                 </span>
               </div>
               {!log.is_approved && (
-                <div className="flex gap-2 mt-3">
-                  <button
-                    onClick={() => handleApprove(log.id, true)}
-                    className="flex-1 py-2 bg-green-500 text-white rounded-xl text-sm font-bold font-cairo hover:bg-green-600"
-                  >
-                    ✓ قبول
-                  </button>
-                  <button
-                    onClick={() => handleApprove(log.id, false)}
-                    className="flex-1 py-2 bg-red-500 text-white rounded-xl text-sm font-bold font-cairo hover:bg-red-600"
-                  >
-                    ✗ رفض
-                  </button>
+                <div className="mt-3 space-y-2">
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="number"
+                      placeholder="نقاط مخصصة (اختياري)"
+                      value={customPoints[log.id] ?? ''}
+                      onChange={(e) => setCustomPoints({ ...customPoints, [log.id]: e.target.value })}
+                      className="input-field font-cairo text-sm flex-1"
+                      min="0"
+                      max="100"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleApprove(log.id, true)}
+                      disabled={approvingId === log.id}
+                      className="flex-1 py-2 bg-green-500 text-white rounded-xl text-sm font-bold font-cairo hover:bg-green-600 disabled:opacity-50"
+                    >
+                      {approvingId === log.id ? '...' : '✓ قبول'}
+                    </button>
+                    <button
+                      onClick={() => handleApprove(log.id, false)}
+                      disabled={approvingId === log.id}
+                      className="flex-1 py-2 bg-red-500 text-white rounded-xl text-sm font-bold font-cairo hover:bg-red-600 disabled:opacity-50"
+                    >
+                      ✗ رفض
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -395,6 +499,168 @@ function RewardManagement() {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function AttendanceManagement() {
+  const [users, setUsers] = useState([])
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [prayerName, setPrayerName] = useState('Fajr')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  useEffect(() => {
+    getUsers().then(res => setUsers(res.data.filter(u => u.role !== 'admin'))).catch(() => setError('فشل في تحميل المستخدمين'))
+  }, [])
+
+  const toggleAll = () => {
+    if (selectedIds.size === users.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(users.map(u => u.id)))
+    }
+  }
+
+  const toggleUser = (id) => {
+    setSelectedIds(prev => {
+      const n = new Set(prev)
+      if (n.has(id)) n.delete(id); else n.add(id)
+      return n
+    })
+  }
+
+  const handleSubmit = async () => {
+    if (selectedIds.size === 0) { setError('اختاري طفلاً واحداً على الأقل'); return }
+    setLoading(true); setError(''); setSuccess('')
+    try {
+      const res = await markAttendance(prayerName, Array.from(selectedIds))
+      setSuccess(res.data.message)
+      setSelectedIds(new Set())
+    } catch (err) { setError(err.response?.data?.detail || 'فشل في تسجيل الحضور') }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <div>
+      {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl mb-3 text-sm font-cairo">{error}</div>}
+      {success && <div className="bg-green-50 text-green-600 p-3 rounded-xl mb-3 text-sm font-cairo">{success}</div>}
+
+      <div className="card space-y-4">
+        <h3 className="font-bold font-cairo text-lg">📋 تحضير الأطفال للصلاة</h3>
+
+        <div>
+          <label className="block text-sm font-cairo text-gray-600 mb-1">اختيار الصلاة:</label>
+          <select
+            value={prayerName}
+            onChange={(e) => setPrayerName(e.target.value)}
+            className="input-field font-cairo"
+          >
+            {PRAYER_NAMES.map(n => <option key={n} value={n}>{PRAYER_ICONS[n]} {PRAYER_LABELS[n]}</option>)}
+          </select>
+        </div>
+
+        <label className="flex items-center gap-2 cursor-pointer font-cairo text-sm">
+          <input
+            type="checkbox"
+            checked={selectedIds.size === users.length && users.length > 0}
+            onChange={toggleAll}
+            className="w-4 h-4"
+          />
+          <span>تحديد الكل</span>
+        </label>
+
+        <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+          {users.map(u => (
+            <label key={u.id} className={`flex items-center gap-2 p-2 rounded-xl cursor-pointer font-cairo text-sm ${
+              selectedIds.has(u.id) ? 'bg-primary-50 border border-primary-200' : 'bg-gray-50'
+            }`}>
+              <input
+                type="checkbox"
+                checked={selectedIds.has(u.id)}
+                onChange={() => toggleUser(u.id)}
+                className="w-4 h-4"
+              />
+              <span>{u.first_name}</span>
+              <span className="text-xs text-gray-400">{u.category}</span>
+            </label>
+          ))}
+        </div>
+
+        <button
+          onClick={handleSubmit}
+          disabled={loading || selectedIds.size === 0}
+          className="btn-primary w-full font-cairo disabled:opacity-50"
+        >
+          {loading ? 'جاري التسجيل...' : '📋 تسجيل الحضور'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function SettingsManagement() {
+  const [goldenWindow, setGoldenWindow] = useState(30)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  useEffect(() => {
+    getAdminSettings().then(res => setGoldenWindow(res.data.golden_window_minutes)).catch(() => setError('فشل في تحميل الإعدادات')).finally(() => setLoading(false))
+  }, [])
+
+  const handleSave = async () => {
+    setSaving(true); setError(''); setSuccess('')
+    try {
+      await updateSettings({ golden_window_minutes: goldenWindow })
+      setSuccess('تم حفظ الإعدادات بنجاح')
+    } catch (err) { setError(err.response?.data?.detail || 'فشل في حفظ الإعدادات') }
+    finally { setSaving(false) }
+  }
+
+  if (loading) return <div className="text-center py-8 text-gray-400 font-cairo">جاري التحميل...</div>
+
+  return (
+    <div>
+      {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl mb-3 text-sm font-cairo">{error}</div>}
+      {success && <div className="bg-green-50 text-green-600 p-3 rounded-xl mb-3 text-sm font-cairo">{success}</div>}
+
+      <div className="card space-y-4">
+        <h3 className="font-bold font-cairo text-lg">⚙️ الإعدادات</h3>
+
+        <div>
+          <label className="block text-sm font-cairo text-gray-600 mb-1">مدة النافذة الذهبية (بالدقائق):</label>
+          <input
+            type="number"
+            value={goldenWindow}
+            onChange={(e) => setGoldenWindow(parseInt(e.target.value) || 30)}
+            className="input-field font-cairo"
+            min="1"
+            max="180"
+          />
+          <p className="text-xs text-gray-400 mt-1 font-cairo">
+            المدة المسموحة بعد الأذان لتسجيل الصلاة بنقاط كاملة. حالياً: {goldenWindow} دقيقة
+          </p>
+        </div>
+
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="btn-primary w-full font-cairo disabled:opacity-50"
+        >
+          {saving ? 'جاري الحفظ...' : '💾 حفظ الإعدادات'}
+        </button>
+      </div>
+
+      <div className="card mt-4 space-y-3">
+        <h4 className="font-bold font-cairo">نقاط التقييم الحالية</h4>
+        <div className="text-sm font-cairo text-gray-600 space-y-1">
+          <p>🧒 الأطفال (أقل من 15 سنة): 5 نقاط أساسي + 3 نقاط مكافأة = 8 نقاط</p>
+          <p>🧑 الكبار (15 سنة فأكثر): 2 نقطة أساسي + 5 نقاط مكافأة = 7 نقاط</p>
+        </div>
+      </div>
     </div>
   )
 }

@@ -6,6 +6,14 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 
 
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(100), unique=True, nullable=False)
+    value = Column(String(500), nullable=False)
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -17,6 +25,7 @@ class User(Base):
     pin_hash = Column(String(255), nullable=False)
     role = Column(String(10), nullable=False, default="user")
     total_points = Column(Integer, nullable=False, default=0)
+    show_leaderboard = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
