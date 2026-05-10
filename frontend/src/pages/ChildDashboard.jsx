@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { getPrayerTimes, logPrayer, getMyLogs, getPrayerSettings } from '../services/api'
-import { fmtHijri, fmtTime } from '../utils/date'
-import Celebration from '../components/Celebration'
+import { getPrayerTimes, logPrayer, getMyLogs, getPrayerSettings, getLeaderboard, getMe } from '../services/api'
+import { fmtTime } from '../utils/date'
 
 const PRAYER_NAMES = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']
 const PRAYER_LABELS = { Fajr: 'الفجر', Dhuhr: 'الظهر', Asr: 'العصر', Maghrib: 'المغرب', Isha: 'العشاء' }
@@ -15,9 +14,7 @@ export default function ChildDashboard() {
   const [loading, setLoading] = useState(true)
   const [logging, setLogging] = useState(null)
   const [error, setError] = useState('')
-  const [showCelebration, setShowCelebration] = useState(false)
-  const [celebrationMsg, setCelebrationMsg] = useState('')
-  const [rewardAlert, setRewardAlert] = useState(null)
+  const [successLog, setSuccessLog] = useState('')
   const [goldenState, setGoldenState] = useState({ remaining: null, status: 'none' })
   const [goldenWindow, setGoldenWindow] = useState(30)
   const [pointsConfig, setPointsConfig] = useState({ kids_base_points: 5, kids_bonus_points: 3, adults_base_points: 2, adults_bonus_points: 5 })
@@ -40,25 +37,11 @@ export default function ChildDashboard() {
 
   useEffect(() => { const i = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(i) }, [])
 
-  // ---- Rewards ----
-  useEffect(() => {
-    const check = async () => {
-      try {
-        const m = await import('../services/api')
-        const res = await m.getMyRewards()
-        const approved = res.data.find(r => r.is_approved)
-        if (approved) { setCelebrationMsg(`🎉 مبروك! مكافأة ${approved.milestone_points} نقطة!`); setShowCelebration(true) }
-      } catch {}
-    }
-    check(); const i = setInterval(check, 15000); return () => clearInterval(i)
-  }, [])
-
   // ---- Rank ----
   useEffect(() => {
     const fetchRank = async () => {
       try {
-        const m = await import('../services/api')
-        const res = await m.getLeaderboard(user.age < 15 ? 'Kids' : 'Adults')
+        const res = await getLeaderboard(user.age < 15 ? 'Kids' : 'Adults')
         const idx = res.data.entries.findIndex(e => e.user_id === user.id)
         setRank(idx >= 0 ? idx + 1 : null)
       } catch {}
@@ -108,18 +91,17 @@ export default function ChildDashboard() {
 
   const handleLogPrayer = async (prayerName) => {
     if (!prayerTimes?.[prayerName] || logging) return
-    setLogging(prayerName); setError('')
+    setLogging(prayerName); setError(''); setSuccessLog('')
     const t = parseTime(prayerName)
     if (!t) return
     try {
       const payload = { prayer_name: prayerName, prayer_time: t.toISOString(), is_congregation: user.gender === 'Male' && prayerToggle.is_congregation, is_early_time: user.gender === 'Female' && prayerToggle.is_early_time }
       const res = await logPrayer(payload)
-      const { points_awarded, is_approved } = res.data
-      setCelebrationMsg(points_awarded >= 8 ? `+${points_awarded} نقطة! أداء رائع! 🎉` : `+${points_awarded} نقطة! أحسنت!`)
-      setShowCelebration(true)
-      const [lr, mr] = await Promise.all([getMyLogs(), (await (await import('../services/api')).getMe())])
+      const { is_approved } = res.data
+      setSuccessLog('تم تسجيل حضورك للصلاة ✓')
+      const [lr, mr] = await Promise.all([getMyLogs(), getMe()])
       setLogs(lr.data); refreshUser(mr.data)
-      if (!is_approved) setRewardAlert('بإنتظار مراجعة الأم')
+      if (!is_approved) setSuccessLog('تم تسجيل حضورك للصلاة (بانتظار مراجعة الأم)')
     } catch (err) { setError(err.response?.data?.detail || 'فشل') }
     finally { setLogging(null) }
   }
@@ -156,8 +138,6 @@ export default function ChildDashboard() {
 
   return (
     <div className="space-y-4">
-      <Celebration show={showCelebration} message={celebrationMsg} onClose={() => setShowCelebration(false)} />
-
       {/* Points bar */}
       <div className="card flex items-center justify-between py-3">
         <div>
@@ -172,9 +152,9 @@ export default function ChildDashboard() {
         )}
       </div>
 
-      {/* Errors & alerts */}
+      {/* Simple notifications */}
+      {successLog && <div className="bg-green-50 text-green-700 p-3 rounded-xl text-sm text-center font-cairo border border-green-200">{successLog}</div>}
       {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm text-center font-cairo border border-red-200">{error}</div>}
-      {rewardAlert && <div className="bg-gold-50 text-gold-700 p-3 rounded-xl text-sm text-center font-cairo border border-gold-200">{rewardAlert}</div>}
 
       {/* ===== CURRENT PRAYER HERO ===== */}
       {currentPrayer && !currentPrayer.logged && (
