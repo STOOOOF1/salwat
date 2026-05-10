@@ -20,34 +20,36 @@ export default function MotherDashboard() {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState('users')
 
+  const TABS = [
+    { key: 'users', label: 'الأطفال', icon: '👶' },
+    { key: 'logs', label: 'التسجيلات', icon: '📝' },
+    { key: 'rewards', label: 'المكافآت', icon: '🎁' },
+    { key: 'attendance', label: 'تحضير', icon: '📋' },
+    { key: 'settings', label: 'الإعدادات', icon: '⚙️' },
+  ]
+
   return (
     <div className="space-y-6">
       {/* Welcome */}
-      <div className="card text-center">
-        <div className="text-4xl mb-2">🌺</div>
-        <h1 className="text-2xl font-bold font-cairo text-primary-800">مرحباً يا أمي</h1>
-        <p className="text-gray-500 font-cairo">لوحة التحكم والإدارة</p>
+      <div className="card text-center py-4">
+        <div className="text-3xl mb-1">🌺</div>
+        <h1 className="text-xl font-bold font-cairo text-primary-800">مرحباً يا أمي</h1>
       </div>
 
-      {/* Tabs */}
-      <div className="flex rounded-xl bg-gray-100 p-1 gap-1 flex-wrap">
-        {[
-          { key: 'users', label: 'الأطفال', icon: '👶' },
-          { key: 'logs', label: 'التسجيلات', icon: '📝' },
-          { key: 'rewards', label: 'المكافآت', icon: '🎁' },
-          { key: 'attendance', label: 'تحضير', icon: '📋' },
-          { key: 'settings', label: 'الإعدادات', icon: '⚙️' },
-        ].map((tab) => (
+      {/* Tabs - Icon Grid */}
+      <div className="grid grid-cols-5 gap-2">
+        {TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`flex-1 py-2.5 rounded-lg text-sm font-bold font-cairo transition-all ${
+            className={`flex flex-col items-center py-3 rounded-2xl font-cairo transition-all ${
               activeTab === tab.key
-                ? 'bg-white shadow text-primary-700'
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'bg-primary-600 text-white shadow-lg shadow-primary-200 scale-105'
+                : 'bg-white text-gray-500 shadow-sm hover:shadow hover:text-gray-700'
             }`}
           >
-            {tab.icon} {tab.label}
+            <span className="text-2xl">{tab.icon}</span>
+            <span className={`text-[10px] mt-1 font-bold ${activeTab === tab.key ? 'text-white' : 'text-gray-400'}`}>{tab.label}</span>
           </button>
         ))}
       </div>
@@ -71,6 +73,7 @@ function UserManagement() {
   const [form, setForm] = useState({ first_name: '', age: '', gender: 'Male', region: 'Makkah', pin: '1234', role: 'user' })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [menuOpen, setMenuOpen] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -93,6 +96,7 @@ function UserManagement() {
     setForm({ first_name: u.first_name, age: String(u.age), gender: u.gender, region: u.region, pin: '', role: u.role })
     setEditing(u.id)
     setShowForm(true)
+    setMenuOpen(null)
   }
 
   const handleSave = async (e) => {
@@ -163,6 +167,14 @@ function UserManagement() {
     } catch { setError('فشل في تغيير الإعداد') }
   }
 
+  // Close menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return
+    const close = (e) => { if (!e.target.closest('.user-menu')) setMenuOpen(null) }
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [menuOpen])
+
   if (loading) return <div className="text-center py-8 text-gray-400 font-cairo">جاري التحميل...</div>
 
   return (
@@ -179,55 +191,32 @@ function UserManagement() {
 
       {showForm && (
         <form onSubmit={handleSave} className="card mb-4 space-y-3">
-          <input
-            placeholder="الاسم"
-            value={form.first_name}
+          <input placeholder="الاسم" value={form.first_name}
             onChange={(e) => setForm({ ...form, first_name: e.target.value })}
-            className="input-field font-cairo"
-            required
-          />
-          <input
-            type="number"
-            placeholder="العمر"
-            value={form.age}
-            onChange={(e) => setForm({ ...form, age: e.target.value })}
-            className="input-field font-cairo"
-            required
-            min="1"
-            max="120"
-          />
-          <select
-            value={form.gender}
-            onChange={(e) => setForm({ ...form, gender: e.target.value })}
-            className="input-field font-cairo"
-          >
-            <option value="Male">ذكر</option>
-            <option value="Female">أنثى</option>
-          </select>
-          <select
-            value={form.region}
-            onChange={(e) => setForm({ ...form, region: e.target.value })}
-            className="input-field font-cairo"
-          >
-            {REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
-          </select>
-          <select
-            value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
-            className="input-field font-cairo"
-          >
-            <option value="user">طفل</option>
-            <option value="admin">أم (مشرف)</option>
-          </select>
+            className="input-field font-cairo" required />
+          <div className="grid grid-cols-2 gap-3">
+            <input type="number" placeholder="العمر" value={form.age}
+              onChange={(e) => setForm({ ...form, age: e.target.value })}
+              className="input-field font-cairo" required min="1" max="120" />
+            <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}
+              className="input-field font-cairo">
+              <option value="Male">ذكر</option><option value="Female">أنثى</option>
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <select value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}
+              className="input-field font-cairo">
+              {REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}
+              className="input-field font-cairo">
+              <option value="user">طفل</option><option value="admin">أم (مشرف)</option>
+            </select>
+          </div>
           {!editing && (
-            <input
-              placeholder="PIN (4 أرقام)"
-              value={form.pin}
+            <input placeholder="PIN (4 أرقام)" value={form.pin}
               onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-              className="input-field font-cairo text-center"
-              required
-              maxLength={4}
-            />
+              className="input-field font-cairo text-center" required maxLength={4} />
           )}
           <button type="submit" className="btn-primary w-full font-cairo">
             {editing ? 'تحديث' : 'إضافة'}
@@ -237,22 +226,48 @@ function UserManagement() {
 
       <div className="space-y-3">
         {users.filter((u) => u.id !== user?.id).map((u) => (
-          <div key={u.id} className="card flex items-center justify-between">
-            <div>
-              <div className="font-bold font-cairo">{u.first_name}</div>
-              <div className="text-xs text-gray-500 font-cairo">
-                {u.age} سنة - {u.gender === 'Male' ? 'ذكر' : 'أنثى'} - {u.region} - {u.role === 'admin' ? 'مشرف' : u.category}
+          <div key={u.id} className="card flex items-center justify-between relative">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold text-white ${
+                u.gender === 'Male' ? 'bg-blue-400' : 'bg-pink-400'
+              }`}>
+                {u.first_name[0]}
               </div>
-              <div className="text-primary-600 font-bold font-cairo">{u.total_points} نقطة</div>
+              <div>
+                <div className="font-bold font-cairo">{u.first_name}</div>
+                <div className="text-[11px] text-gray-400 font-cairo">
+                  {u.age} سنة · {u.gender === 'Male' ? 'ذكر' : 'أنثى'} · {u.region}
+                </div>
+                <div className="text-primary-600 font-bold font-cairo text-sm">{u.total_points} نقطة</div>
+              </div>
             </div>
-            <div className="flex gap-2 flex-wrap">
-              <button onClick={() => openEdit(u)} className="text-sm text-blue-600 hover:text-blue-800 font-cairo">تعديل</button>
-              <button onClick={() => handleResetPin(u.id)} className="text-sm text-gold-600 hover:text-gold-800 font-cairo">PIN</button>
-              <button onClick={() => handleResetPoints(u.id, u.first_name)} className="text-sm text-orange-600 hover:text-orange-800 font-cairo">تصفير</button>
-              <button onClick={() => handleToggleLeaderboard(u.id, u.first_name)} className={`text-sm font-cairo ${u.show_leaderboard ? 'text-green-600 hover:text-green-800' : 'text-gray-400 hover:text-gray-600'}`}>
-                {u.show_leaderboard ? '🏆 ظاهر' : '🏆 مخفي'}
+
+            {/* Three-dot menu */}
+            <div className="user-menu relative">
+              <button onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === u.id ? null : u.id) }}
+                className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400">
+                <span className="text-xl leading-none">⋯</span>
               </button>
-              <button onClick={() => handleDelete(u.id, u.first_name)} className="text-sm text-red-600 hover:text-red-800 font-cairo">حذف</button>
+              {menuOpen === u.id && (
+                <div className="absolute left-0 bottom-full mb-1 bg-white rounded-xl shadow-xl border border-gray-100 py-1 min-w-[140px] z-20">
+                  <button onClick={() => openEdit(u)} className="w-full text-right px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 font-cairo flex items-center gap-2">
+                    ✏️ تعديل
+                  </button>
+                  <button onClick={() => { setMenuOpen(null); handleResetPin(u.id) }} className="w-full text-right px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 font-cairo flex items-center gap-2">
+                    🔑 PIN
+                  </button>
+                  <button onClick={() => { setMenuOpen(null); handleResetPoints(u.id, u.first_name) }} className="w-full text-right px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 font-cairo flex items-center gap-2">
+                    🔄 تصفير النقاط
+                  </button>
+                  <button onClick={() => { setMenuOpen(null); handleToggleLeaderboard(u.id, u.first_name) }} className={`w-full text-right px-4 py-2 text-sm hover:bg-gray-50 font-cairo flex items-center gap-2 ${u.show_leaderboard ? 'text-green-600' : 'text-gray-400'}`}>
+                    {u.show_leaderboard ? '🏆 إخفاء المتصدرين' : '🏆 إظهار المتصدرين'}
+                  </button>
+                  <div className="border-t border-gray-100 my-1" />
+                  <button onClick={() => { setMenuOpen(null); handleDelete(u.id, u.first_name) }} className="w-full text-right px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-cairo flex items-center gap-2">
+                    🗑️ حذف
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -306,10 +321,11 @@ function LogManagement() {
   }
 
   const selectAll = () => {
-    if (selectedIds.size === logs.filter(l => !l.is_approved).length) {
+    const pending = logs.filter(l => !l.is_approved)
+    if (selectedIds.size === pending.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(logs.filter(l => !l.is_approved).map(l => l.id)))
+      setSelectedIds(new Set(pending.map(l => l.id)))
     }
   }
 
@@ -323,8 +339,7 @@ function LogManagement() {
         await approveLog(id, data)
       } catch { }
     }
-    setCustomPoints({})
-    fetchLogs()
+    setCustomPoints({}); fetchLogs()
   }
 
   if (loading) return <div className="text-center py-8 text-gray-400 font-cairo">جاري التحميل...</div>
@@ -333,21 +348,26 @@ function LogManagement() {
     <div>
       {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl mb-3 text-sm font-cairo">{error}</div>}
 
-      <label className="flex items-center gap-2 mb-4 cursor-pointer font-cairo">
-        <input
-          type="checkbox"
-          checked={pendingOnly}
-          onChange={(e) => setPendingOnly(e.target.checked)}
-          className="w-5 h-5"
-        />
-        <span>تسجيلات بانتظار المراجعة فقط</span>
-      </label>
+      <div className="flex items-center justify-between mb-4">
+        <label className="flex items-center gap-2 cursor-pointer font-cairo text-sm">
+          <input type="checkbox" checked={pendingOnly}
+            onChange={(e) => setPendingOnly(e.target.checked)}
+            className="w-4 h-4" />
+          <span>بانتظار المراجعة فقط</span>
+        </label>
+        {logs.filter(l => !l.is_approved).length > 1 && (
+          <label className="flex items-center gap-2 cursor-pointer font-cairo text-sm">
+            <input type="checkbox"
+              checked={selectedIds.size === logs.filter(l => !l.is_approved).length && logs.filter(l => !l.is_approved).length > 0}
+              onChange={selectAll} className="w-4 h-4" />
+            <span>تحديد الكل</span>
+          </label>
+        )}
+      </div>
 
       {selectedIds.size > 0 && (
-        <button
-          onClick={approveSelected}
-          className="btn-primary w-full mb-4 font-cairo bg-green-600"
-        >
+        <button onClick={approveSelected}
+          className="btn-primary w-full mb-4 font-cairo bg-green-600">
           ✓ قبول الكل ({selectedIds.size})
         </button>
       )}
@@ -358,73 +378,54 @@ function LogManagement() {
         </p>
       ) : (
         <div className="space-y-3">
-          {logs.filter(l => !l.is_approved).length > 1 && (
-            <label className="flex items-center gap-2 mb-2 cursor-pointer font-cairo text-sm">
-              <input
-                type="checkbox"
-                checked={selectedIds.size === logs.filter(l => !l.is_approved).length && logs.filter(l => !l.is_approved).length > 0}
-                onChange={selectAll}
-                className="w-4 h-4"
-              />
-              <span>تحديد الكل للقبول</span>
-            </label>
-          )}
           {logs.map((log) => (
-            <div key={log.id} className={`card ${!log.is_approved && selectedIds.has(log.id) ? 'border-2 border-green-400' : ''}`}>
-              <div className="flex items-center justify-between mb-2">
+            <div key={log.id} className={`card ${!log.is_approved && selectedIds.has(log.id) ? 'ring-2 ring-green-400' : ''}`}>
+              {/* Header row */}
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 font-cairo">
                   {!log.is_approved && (
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(log.id)}
-                      onChange={() => toggleSelect(log.id)}
-                      className="w-4 h-4 ml-1"
-                    />
+                    <input type="checkbox" checked={selectedIds.has(log.id)}
+                      onChange={() => toggleSelect(log.id)} className="w-4 h-4" />
                   )}
                   <span className="text-lg">{PRAYER_ICONS[log.prayer_name]}</span>
-                  <span className="font-bold">{log.user_name || 'مستخدم'}</span>
-                  <span className="text-primary-600 font-bold">+{log.points_awarded}</span>
+                  <span className="font-bold text-sm">{log.user_name || 'مستخدم'}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                    log.is_approved ? 'bg-green-100 text-green-700' : 'bg-gold-100 text-gold-700'
+                  }`}>
+                    {log.is_approved ? 'مقبول' : 'بانتظار'}
+                  </span>
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-cairo ${
-                  log.is_approved ? 'bg-green-100 text-green-700' : 'bg-gold-100 text-gold-700'
-                }`}>
-                  {log.is_approved ? 'مقبول' : 'بالانتظار'}
+                <span className="font-bold text-primary-600">+{log.points_awarded}</span>
+              </div>
+
+              {/* Meta row */}
+              <div className="flex items-center justify-between mt-1.5 text-[11px] text-gray-400 font-cairo">
+                <span>{PRAYER_LABELS[log.prayer_name]} · {fmtHijri(log.logged_at)}</span>
+                <span className="flex gap-1.5">
+                  {log.is_congregation && <span>🕌</span>}
+                  {log.is_early_time && <span>⏰</span>}
+                  <span>{log.is_within_golden_window ? '✅ ذهبية' : '⏰ خارج'}</span>
                 </span>
               </div>
-              <div className="text-xs text-gray-500 font-cairo flex justify-between">
-                <span>{PRAYER_LABELS[log.prayer_name]} | {fmtHijri(log.logged_at)}</span>
-                <span className="flex gap-1">
-                  {log.is_congregation && <span title="صلاة الجماعة">🕌</span>}
-                  {log.is_early_time && <span title="في أول الوقت">⏰</span>}
-                  {log.is_within_golden_window ? '✅ النافذة الذهبية' : '⏰ خارج النافذة'}
-                </span>
-              </div>
+
+              {/* Action area for pending */}
               {!log.is_approved && (
-                <div className="mt-3 space-y-2">
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="number"
-                      placeholder="نقاط مخصصة (اختياري)"
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <div className="flex gap-2 items-center mb-2">
+                    <input type="number" placeholder="نقاط مخصصة"
                       value={customPoints[log.id] ?? ''}
                       onChange={(e) => setCustomPoints({ ...customPoints, [log.id]: e.target.value })}
-                      className="input-field font-cairo text-sm flex-1"
-                      min="0"
-                      max="100"
-                    />
+                      className="input-field font-cairo text-sm flex-1 h-9" min="0" max="100" />
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => handleApprove(log.id, true)}
+                    <button onClick={() => handleApprove(log.id, true)}
                       disabled={approvingId === log.id}
-                      className="flex-1 py-2 bg-green-500 text-white rounded-xl text-sm font-bold font-cairo hover:bg-green-600 disabled:opacity-50"
-                    >
-                      {approvingId === log.id ? '...' : '✓ قبول'}
+                      className="flex-1 py-2 bg-green-500 text-white rounded-xl text-sm font-bold font-cairo hover:bg-green-600 disabled:opacity-50">
+                      ✓ قبول
                     </button>
-                    <button
-                      onClick={() => handleApprove(log.id, false)}
+                    <button onClick={() => handleApprove(log.id, false)}
                       disabled={approvingId === log.id}
-                      className="flex-1 py-2 bg-red-500 text-white rounded-xl text-sm font-bold font-cairo hover:bg-red-600 disabled:opacity-50"
-                    >
+                      className="flex-1 py-2 bg-red-500 text-white rounded-xl text-sm font-bold font-cairo hover:bg-red-600 disabled:opacity-50">
                       ✗ رفض
                     </button>
                   </div>
