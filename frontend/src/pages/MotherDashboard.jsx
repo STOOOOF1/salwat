@@ -6,7 +6,7 @@ import {
   getRewards, approveReward,
   toggleLeaderboard,
   markAttendance,
-  getAdminSettings, updateSettings,
+  getAdminSettings, updateSettings, resetWeek,
 } from '../services/api'
 import { fmtHijri, fmtTime } from '../utils/date'
 
@@ -611,6 +611,7 @@ function SettingsManagement() {
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
@@ -716,6 +717,18 @@ function SettingsManagement() {
         <button onClick={handleSave} disabled={saving}
           className="btn-primary w-full font-cairo disabled:opacity-50">
           {saving ? 'جاري الحفظ...' : '💾 حفظ الإعدادات'}
+        </button>
+      </div>
+
+      {/* Reset Week */}
+      <div className="card mt-4 border-2 border-red-200 bg-red-50 space-y-3">
+        <h4 className="font-bold font-cairo text-red-700">⚠️ تصفير الأسبوع</h4>
+        <p className="text-xs text-red-600 font-cairo">
+          سيتم أرشفة بيانات هذا الأسبوع (نقاط وترتيب الجميع) وتصفير نقاط الجميع إلى 0 لبدء أسبوع جديد.
+        </p>
+        <button onClick={handleResetWeek} disabled={resetting}
+          className="w-full py-3 rounded-xl text-sm font-bold font-cairo bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+          {resetting ? 'جاري التصفير...' : '🔄 تصفير الأسبوع ونقل للأرشيف'}
         </button>
       </div>
     </div>

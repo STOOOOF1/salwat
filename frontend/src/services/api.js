@@ -102,6 +102,9 @@ export const updateSettings = (data) => api.put('/admin/settings', data)
 // Public - Settings
 export const getPrayerSettings = () => api.get('/prayer/settings')
 
+// Admin - Reset Week
+export const resetWeek = () => api.post('/admin/reset-week')
+
 // Archive
 export const getArchivedWeeks = () => api.get('/archive/weeks')
 

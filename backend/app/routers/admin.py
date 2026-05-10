@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from uuid import UUID
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from app.database import get_db
-from app.models import User, PrayerLog, RewardMilestone, AppSetting
+from app.models import User, PrayerLog, RewardMilestone, AppSetting, WeeklyLeaderboard
 from app.schemas import (
     UserCreate, UserUpdate, UserResponse, UserWithPinResponse,
     PrayerLogResponse, PrayerLogApprove,
@@ -333,6 +333,47 @@ def update_settings(
         set_setting(db, "reward_milestones", ",".join(str(x) for x in sorted(vm)))
 
     return get_settings(db, _=None)
+
+
+# ---- Reset Week ----
+
+@router.post("/reset-week")
+def reset_week(
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    today = date.today()
+    days_since_saturday = (today.weekday() - 5) % 7
+    week_start = today - timedelta(days=days_since_saturday)
+    week_end = week_start + timedelta(days=6)
+
+    users = db.query(User).filter(User.role == "user").all()
+
+    # Archive Kids
+    kids = sorted([u for u in users if u.category == "Kids"], key=lambda u: u.total_points, reverse=True)
+    for i, u in enumerate(kids):
+        db.add(WeeklyLeaderboard(
+            user_id=u.id, week_start=week_start, week_end=week_end,
+            total_points=u.total_points, rank=i + 1, category="Kids", is_archived=True,
+        ))
+
+    # Archive Adults
+    adults = sorted([u for u in users if u.category == "Adults"], key=lambda u: u.total_points, reverse=True)
+    for i, u in enumerate(adults):
+        db.add(WeeklyLeaderboard(
+            user_id=u.id, week_start=week_start, week_end=week_end,
+            total_points=u.total_points, rank=i + 1, category="Adults", is_archived=True,
+        ))
+
+    # Reset all points to 0
+    db.query(User).filter(User.role == "user").update({"total_points": 0})
+
+    db.commit()
+    return {
+        "message": "تم تصفير الأسبوع وأرشفة البيانات",
+        "archived_kids": len(kids),
+        "archived_adults": len(adults),
+    }
 
 
 @router.get("/users-with-pins", response_model=list[UserWithPinResponse])
