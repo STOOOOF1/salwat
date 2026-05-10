@@ -218,7 +218,10 @@ def mark_attendance(
 
     region = users[0].region
     from app.services.prayer_times import fetch_prayer_times
-    times = fetch_prayer_times(region)
+
+    # Use provided date or today
+    date_str = req.log_date.strftime("%d-%m-%Y") if req.log_date else None
+    times = fetch_prayer_times(region, date_str)
     if "error" in times:
         raise HTTPException(status_code=502, detail=times["error"])
 
@@ -229,8 +232,11 @@ def mark_attendance(
     h, m = map(int, pt_str.split(":"))
     # Aladhan API returns local Saudi time (UTC+3), convert to UTC
     sa_tz = timezone(timedelta(hours=3))
-    now_sa = datetime.now(sa_tz)
-    prayer_sa = now_sa.replace(hour=h, minute=m, second=0, microsecond=0)
+    if req.log_date:
+        prayer_sa = datetime(req.log_date.year, req.log_date.month, req.log_date.day, h, m, tzinfo=sa_tz)
+    else:
+        now_sa = datetime.now(sa_tz)
+        prayer_sa = now_sa.replace(hour=h, minute=m, second=0, microsecond=0)
     prayer_dt = prayer_sa.astimezone(timezone.utc)
     golden_end = prayer_dt + timedelta(minutes=gw)
     is_within = now <= golden_end
@@ -248,8 +254,9 @@ def mark_attendance(
         is_kid = u.age < 15
         base = pc["kids_base_points"] if is_kid else pc["adults_base_points"]
         bonus = pc["kids_bonus_points"] if is_kid else pc["adults_bonus_points"]
+        # Attendance by admin is always approved (no bonus for past dates)
+        approved = True
         points = base + bonus if is_within else base
-        approved = is_within
 
         log = PrayerLog(
             user_id=u.id,
@@ -267,9 +274,8 @@ def mark_attendance(
         db.flush()
         created.append(log)
 
-        # Update total_points directly (reliable, doesn't depend on trigger)
-        if approved:
-            u.total_points += points
+        # Update total_points directly
+        u.total_points += points
 
     db.commit()
     return {"message": f"تم تسجيل {len(created)} أطفال", "count": len(created)}

@@ -200,3 +200,4 @@ class AttendanceRecord(BaseModel):
 class AttendanceRequest(BaseModel):
     prayer_name: str
     user_ids: list[UUID]
+    log_date: Optional[date] = None

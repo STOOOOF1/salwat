@@ -91,8 +91,8 @@ export const approveReward = (id, is_approved) =>
   api.patch(`/admin/rewards/${id}`, { is_approved })
 
 // Admin - Attendance
-export const markAttendance = (prayer_name, user_ids) =>
-  api.post('/admin/attendance', { prayer_name, user_ids })
+export const markAttendance = (prayer_name, user_ids, log_date = null) =>
+  api.post('/admin/attendance', { prayer_name, user_ids, log_date })
 
 // Admin - Settings
 export const getAdminSettings = () => api.get('/admin/settings')

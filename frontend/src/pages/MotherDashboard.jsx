@@ -508,6 +508,7 @@ function AttendanceManagement() {
   const [users, setUsers] = useState([])
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [prayerName, setPrayerName] = useState('Fajr')
+  const [logDate, setLogDate] = useState(new Date().toISOString().split('T')[0])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -536,7 +537,7 @@ function AttendanceManagement() {
     if (selectedIds.size === 0) { setError('اختاري طفلاً واحداً على الأقل'); return }
     setLoading(true); setError(''); setSuccess('')
     try {
-      const res = await markAttendance(prayerName, Array.from(selectedIds))
+      const res = await markAttendance(prayerName, Array.from(selectedIds), logDate)
       setSuccess(res.data.message)
       setSelectedIds(new Set())
     } catch (err) { setError(err.response?.data?.detail || 'فشل في تسجيل الحضور') }
@@ -560,6 +561,16 @@ function AttendanceManagement() {
           >
             {PRAYER_NAMES.map(n => <option key={n} value={n}>{PRAYER_ICONS[n]} {PRAYER_LABELS[n]}</option>)}
           </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-cairo text-gray-600 mb-1">📅 التاريخ:</label>
+          <input
+            type="date"
+            value={logDate}
+            onChange={(e) => setLogDate(e.target.value)}
+            className="input-field font-cairo"
+          />
         </div>
 
         <label className="flex items-center gap-2 cursor-pointer font-cairo text-sm">

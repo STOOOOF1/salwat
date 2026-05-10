@@ -10,13 +10,13 @@ REGION_CITY_MAP = {
 }
 
 
-def fetch_prayer_times(region: str) -> dict:
+def fetch_prayer_times(region: str, date_str: str | None = None) -> dict:
     if region not in REGION_CITY_MAP:
         return {"error": f"Unsupported region: {region}"}
 
     location = REGION_CITY_MAP[region]
-    today = datetime.now().strftime("%d-%m-%Y")
-    url = f"{settings.PRAYER_API_BASE_URL}/timingsByCity/{today}"
+    day = date_str or datetime.now().strftime("%d-%m-%Y")
+    url = f"{settings.PRAYER_API_BASE_URL}/timingsByCity/{day}"
 
     params = {
         "city": location["city"],
