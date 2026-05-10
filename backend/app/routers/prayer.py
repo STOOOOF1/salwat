@@ -51,6 +51,19 @@ def log_prayer(
     if not is_within_window:
         is_approved = False
 
+    # Prevent duplicate: same prayer on same date
+    sa_tz = timezone(timedelta(hours=3))
+    day_start = req.prayer_time.astimezone(sa_tz).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+    day_end = day_start + timedelta(days=1)
+    existing = db.query(PrayerLog).filter(
+        PrayerLog.user_id == current_user.id,
+        PrayerLog.prayer_name == req.prayer_name,
+        PrayerLog.prayer_time >= day_start,
+        PrayerLog.prayer_time < day_end,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="تم تسجيل هذه الصلاة مسبقاً لهذا اليوم")
+
     log = PrayerLog(
         user_id=current_user.id,
         prayer_name=req.prayer_name,

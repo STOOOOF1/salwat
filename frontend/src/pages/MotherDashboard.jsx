@@ -508,10 +508,30 @@ function AttendanceManagement() {
   const [users, setUsers] = useState([])
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [prayerName, setPrayerName] = useState('Fajr')
-  const [logDate, setLogDate] = useState(new Date().toISOString().split('T')[0])
+  const [daysAgo, setDaysAgo] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  const selectedDate = new Date()
+  selectedDate.setDate(selectedDate.getDate() - daysAgo)
+  const logDate = selectedDate.toISOString().split('T')[0]
+
+  const hijriDate = fmtHijri(selectedDate.toISOString(), false)
+
+  const DAYS_OPTIONS = [
+    { value: 0, label: 'اليوم' },
+    { value: 1, label: 'أمس' },
+    { value: 2, label: 'قبل يومين' },
+    { value: 3, label: 'قبل ٣ أيام' },
+    { value: 4, label: 'قبل ٤ أيام' },
+    { value: 5, label: 'قبل ٥ أيام' },
+    { value: 6, label: 'قبل ٦ أيام' },
+    { value: 7, label: 'قبل أسبوع' },
+    { value: 14, label: 'قبل أسبوعين' },
+    { value: 21, label: 'قبل ٣ أسابيع' },
+    { value: 30, label: 'قبل شهر' },
+  ]
 
   useEffect(() => {
     getUsers().then(res => setUsers(res.data.filter(u => u.role !== 'admin'))).catch(() => setError('فشل في تحميل المستخدمين'))
@@ -564,13 +584,19 @@ function AttendanceManagement() {
         </div>
 
         <div>
-          <label className="block text-sm font-cairo text-gray-600 mb-1">📅 التاريخ:</label>
-          <input
-            type="date"
-            value={logDate}
-            onChange={(e) => setLogDate(e.target.value)}
+          <label className="block text-sm font-cairo text-gray-600 mb-1">📅 التاريخ الهجري:</label>
+          <select
+            value={daysAgo}
+            onChange={(e) => setDaysAgo(parseInt(e.target.value))}
             className="input-field font-cairo"
-          />
+          >
+            {DAYS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <div className="mt-2 text-center font-cairo">
+            <span className="bg-primary-50 text-primary-700 px-4 py-2 rounded-xl text-lg font-bold block">
+              {hijriDate}
+            </span>
+          </div>
         </div>
 
         <label className="flex items-center gap-2 cursor-pointer font-cairo text-sm">

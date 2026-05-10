@@ -241,12 +241,17 @@ def mark_attendance(
     golden_end = prayer_dt + timedelta(minutes=gw)
     is_within = now <= golden_end
 
+    # Check duplicates by same prayer on same Saudi date
+    day_start = prayer_dt.astimezone(sa_tz).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+    day_end = day_start + timedelta(days=1)
+
     created = []
     for u in users:
         existing = db.query(PrayerLog).filter(
             PrayerLog.user_id == u.id,
             PrayerLog.prayer_name == req.prayer_name,
-            PrayerLog.prayer_time == prayer_dt,
+            PrayerLog.prayer_time >= day_start,
+            PrayerLog.prayer_time < day_end,
         ).first()
         if existing:
             continue
